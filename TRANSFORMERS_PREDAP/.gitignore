@@ -1,0 +1,13 @@
+/src/data
+/plots
+/plots_residual_transformers
+/mlruns
+/tf210_env
+/outputs
+/src/__pycache__
+my_project_image1.tar
+/__pycache__
+*.tar
+*.tar.gz
+/**/__pycache__
+/distilled_models

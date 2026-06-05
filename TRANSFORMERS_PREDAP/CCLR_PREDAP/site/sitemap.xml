@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/api/dl/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/api/gcausal/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/api/lmlr/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/getting-started/configuration/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/getting-started/installation/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+    <url>
+         <loc>https://your-organization.github.io/CCLR_PREDAP/getting-started/quickstart/</loc>
+         <lastmod>2025-10-07</lastmod>
+    </url>
+</urlset>

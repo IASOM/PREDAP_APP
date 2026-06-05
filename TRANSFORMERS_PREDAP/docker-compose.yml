@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "127.0.0.1:6379:6379" # Expone el puerto 6379 SOLO a nivel local (seguridad)
+    command: ["redis-server", "--appendonly", "yes"]
+  mi-api-ia:
+    build: .
+    restart: always # Si el servidor se reinicia, tu API también lo hará
+    ports:
+      - "127.0.0.1:8000:8000" # Expone el puerto 8000 SOLO a nivel local (seguridad)
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - JOB_TTL_SECONDS=86400
+    depends_on:
+      - redis
+    volumes:
+      # Conecta la carpeta física del servidor (izquierda) con la del contenedor (derecha)
+      - ${RELATIVE_MODELS_PATH}:/app/${MODELS_FOLDER_NAME}
+      - ${RELATIVE_SAVE_DATA_PATH}:/app/${SAVE_DATA_FOLDER_NAME}
+      - ${RELATIVE_READ_DATA_PATH}:/app/${READ_DATA_FOLDER_NAME}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # This reserves exactly ONE GPU
+              capabilities: [gpu]
+
+     

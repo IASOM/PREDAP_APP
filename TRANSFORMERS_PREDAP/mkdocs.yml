@@ -1,0 +1,126 @@
+site_name: Predap — Healthcare Demand Forecasting
+site_description: >-
+  A high-performance deep learning ecosystem for forecasting healthcare
+  diagnostic visit demand using Transformer-based residual correction pipelines,
+  with a production-ready FastAPI inference API.
+site_author: Predap Engineering Team
+repo_url: https://github.com/organization/predap
+copyright: Copyright &copy; 2024–2026 Predap Team
+
+theme:
+  name: material
+  font:
+    text: Source Sans 3
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: blue
+      accent: orange
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.keys
+  - pymdownx.mark
+
+plugins:
+  - search
+  - mermaid2
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            members_order: source
+            show_signature_annotations: true
+  - mkdocs-jupyter:
+      include_source: true
+      ignore_h1_titles: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  - https://unpkg.com/mermaid/dist/mermaid.min.js
+
+extra_css:
+  - stylesheets/rumia-brand.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/organization/predap
+
+nav:
+  - Overview: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - 5-Minute Quickstart: getting-started/quickstart.md
+  - User Guide:
+      - Data Preprocessing: user-guide/data-preprocessing.md
+      - Model Training: user-guide/model-training.md
+      - Evaluation & Metrics: user-guide/evaluation.md
+      - Configuration Reference: user-guide/configuration.md
+  - API Reference:
+      - Python Core Library:
+          - Univariate Transformer: api-reference/python/univariate-transformer.md
+          - Residual Transformers: api-reference/python/residual-transformers.md
+          - Training Pipelines: api-reference/python/training-pipelines.md
+          - Data Preparation: api-reference/python/data-preparation.md
+          - Utilities: api-reference/python/utils.md
+      - REST API (FastAPI): api-reference/rest-api.md
+      - Pydantic Models: api-reference/pydantic-models.md
+      - External API Report: api-reference/external-api-report.md
+  - Tutorials:
+      - Training Your First Model: tutorials/train-custom-model.md
+      - Grid Search & Hyperparameter Tuning: tutorials/grid-search.md
+      - Hydra Experiment Runner: tutorials/hydra-experiments.md
+  - Deployment:
+      - Production Pipelines: deployment/production-pipelines.md
+      - Docker Containers: deployment/docker.md
+      - Model Quantization: deployment/quantization.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+      - Roadmap: development/roadmap.md

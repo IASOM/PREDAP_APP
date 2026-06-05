@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+
+.git
+.gitignore
+/docs
+*.md
+/post_processing
+/plots
+/outputs
+/notebooks
+/models
+/mlruns
+/logs
+/docs
+/best_hyperparameters_results

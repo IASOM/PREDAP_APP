@@ -1,0 +1,103 @@
+﻿# .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables and local secrets
+.env
+.env.local
+.env.*.local
+
+# Data and generated pipeline outputs
+# Keep real data, generated samples, Parquet/CSV outputs and pipeline state out
+# of Git. Recreate sample outputs with scripts/create_multiyear_sample.py.
+data/
+diagnosis_pipeline/
+*.parquet
+*.csv
+*.pkl
+*.pickle
+*.feather
+
+# Keep lightweight selection templates in Git.
+!selections/
+!selections/*.csv
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Local mapping/data spreadsheets. Keep only non-sensitive templates in Git.
+*.xlsx
+*.xls
+!UPperRS.example.xlsx
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-specific
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Excel temp files
+~$*.xlsx
+.~lock.*
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# State and config (if containing sensitive data)
+# state.json
+# config/.env

@@ -1,0 +1,90 @@
+defaults:
+  - _self_
+  - override hydra/launcher: joblib
+
+# Complete self-contained configuration for grid search
+# Data configuration
+data:
+  data_path: '../data/FINAL_DB/full_CAT1.parquet'
+  codes_path: '../data/FINAL_DB/targets_CAT.json'
+
+experiment_setup: "365_182"  # Default experiment setup
+
+
+experiment_pairs:
+  3_3:   { lb: 3,   fc: 3 }
+  "7_7":   { lb: 7,   fc: 7 }
+  "14_14": { lb: 14,  fc: 14 }
+  "60_30": { lb: 60,  fc: 30 }
+  "60_60": { lb: 60,  fc: 60 }
+  "182_182": { lb: 182,  fc: 182 }
+  "365_182": { lb: 182,  fc: 365 }
+
+# Model configuration (base defaults that will be overridden by sweep parameters)
+model:
+  target_code: "B34" #"J00" #"demanda__TIPUS_CLASS__9T"
+  lookback: ${experiment_pairs.${experiment_setup}.lb}
+  forecast: ${experiment_pairs.${experiment_setup}.fc}
+  num_transformer_blocks: 2
+  head_size: 32
+  num_heads: 8
+  activation: "gelu"
+  covid_token: true 
+  ff_dim: 512
+  mlp_units: [512,256]
+  dropout: 0.5
+  learning_rate: 1e-5
+  
+
+# Training configuration
+training:
+  cutoff_date: "2008-01-01"  # Fixed: Use a date that ensures sufficient training data
+  positional_encoding: true
+  evaluate_model: true
+
+# System configuration  
+system:
+  backend: "Agg"
+
+# MLflow configuration
+mlflow:
+  tracking_uri: "file:./mlruns"
+  experiment_name: "Prova_FullPooling2_TRANSFORMER1_TRANSFORMERS_PREDAP_HYDRA_GRID_SEARCH" #TRANSFORMER3 
+
+# Hydra multirun configuration
+hydra:
+  launcher:
+    n_jobs: 1
+    backend: loky
+  sweep:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  sweeper:
+    params:
+      # Target codes to evaluate
+      model.target_code: demanda__TOTAL, "demanda__SERVEI_CODI__URG", "B34","J00", "I10", "M54","Ch01#subch01#A00-A09" #${load_json_codes_list:../data/FINAL_DB/targets_CAT.json} #demanda__SERVEI_CODI__INF, 'demanda__SERVEI_CODI__INFP', 'demanda__SERVEI_CODI__MF','demanda__SERVEI_CODI__PED','demanda__SERVEI_CODI__URG','demanda__TIPUS_CLASS__9T','demanda__TIPUS_CLASS__C9C','demanda__TIPUS_CLASS__C9R','demanda__TIPUS_CLASS__CALTRE','demanda__TIPUS_CLASS__D9D','demanda__TIPUS_CLASS__DALTRE','demanda__VISI_LLOC_VISITA__C','demanda__VISI_LLOC_VISITA__D','demanda__VISI_LLOC_VISITA__T','demanda__VISI_SITUACIO_VISITA__N','demanda__VISI_SITUACIO_VISITA__R','demanda__TOTAL'
+      
+      # Temporal parameters - lookback and forecast horizons#, 14,7, 30,7, 60,30, 182,60, 365,182
+      #model.lookback,model.forecast: 7,7 
+      experiment_setup: 3_3, "7_7", "14_14", "60_30", "60_60", "182_182", "365_182"
+      #model.lookback: 30,60
+      #model.forecast: 30,60
+      
+      # Model architecture parameters
+      model.num_transformer_blocks: 2
+      model.head_size: 32
+      model.num_heads: 8
+      model.ff_dim: 512
+      model.mlp_units: [512,256] 
+      
+      # Training hyperparameters
+      model.activation: gelu
+      model.covid_token: true
+      model.dropout: 0.5
+      model.learning_rate: 0.00001
+     
+      
+      # Optional: Add training configuration parameters to grid search
+      # training.cutoff_date: "2022-01-01","2021-01-01"
+      # training.positional_encoding: true,false
+      

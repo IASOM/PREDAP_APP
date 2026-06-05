@@ -91,7 +91,7 @@ run_pipeline.py                  (Single entry point)
 
    ```bash
    # Linux/Mac
-   bash setup.sh
+   python setup.py
    ```
 
 ### Phase 3: Migrate Data

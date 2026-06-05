@@ -138,7 +138,7 @@ remaining_tasks = """
    - tests/test_diagnosis.py
    
 4. Optional: Create scripts/ directory:
-   - setup.sh / setup.bat (for one-time setup)
+   - setup.py / setup.bat (for one-time setup)
    - reset_state.py (to reset pipeline state)
    - validate_config.py (to verify configuration)
 """

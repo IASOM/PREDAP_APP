@@ -80,7 +80,6 @@ Created comprehensive documentation:
 Created automated setup tools:
 - **[setup.py](setup.py)** - Python setup script (Windows/Linux/Mac)
 - **[setup.bat](setup.bat)** - Batch setup script (Windows)
-- **[setup.sh](setup.sh)** - Bash setup script (Linux/Mac)
 - **[validate_project.py](validate_project.py)** - Validation checker
 
 ### 7. **Dependency Management** ✓
@@ -127,7 +126,6 @@ PROJECT_STRUCTURE.md                Architecture guide
 run_pipeline.py                     Main entry point
 setup.py                            Python setup script
 setup.bat                           Windows setup script
-setup.sh                            Linux/Mac setup script
 validate_project.py                 Configuration validator
 ```
 
@@ -212,7 +210,7 @@ python run_pipeline.py --both
 ### Setup Tools
 - [setup.py](setup.py) - Python setup
 - [setup.bat](setup.bat) - Windows batch setup
-- [setup.sh](setup.sh) - Unix setup
+
 - [validate_project.py](validate_project.py) - Configuration validator
 
 ### Configuration

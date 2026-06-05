@@ -235,16 +235,16 @@ class BaseTransformerConfig(ABC):
         if learning_rate is not None:
             lr_init = learning_rate
         else:
-            lr_init = self.LEARNING_RATE
-        lr_max = lr_init * self.LR_MAX_MULTIPLIER
-        lr_min = lr_init * self.LR_MIN_MULTIPLIER
-        warmup_steps = int(self.EPOCHS * self.LR_WARMUP_RATIO)
+            lr_init = self.learning_rate
+        lr_max = lr_init * self.lr_max_multiplier
+        lr_min = lr_init * self.lr_min_multiplier
+        warmup_steps = int(self.epochs * self.lr_warmup_ratio)
         
         return {
             'initial_lr': lr_init,
             'max_lr': lr_max,
             'min_lr': lr_min,
             'warmup_steps': warmup_steps,
-            'total_steps': self.EPOCHS
+            'total_steps': self.epochs
         }
     

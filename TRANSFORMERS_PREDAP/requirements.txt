@@ -10,7 +10,7 @@ pandas
 pyarrow==18.1.0
 pydantic==2.12.5
 python_dateutil==2.9.0.post0
-scikit_learn
+scikit-learn>=1.8.0
 scipy
 seaborn
 SQLAlchemy==2.0.48

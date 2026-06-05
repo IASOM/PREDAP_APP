@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, config
-from typing import Optional, List
+from typing import Optional
 import sys
 import os
 from uuid import uuid4
 import json
 from datetime import datetime, timezone
+import pandas as pd
 import redis
 from redis.exceptions import RedisError
 
@@ -64,7 +64,7 @@ def add_new_data(request: AddNewDataRequest = None):
         # Use request values or fall back to config defaults
         new_data_path = request.new_data_path if request and request.new_data_path else config.data_path
         cutoff_date = request.cutoff_date if request and request.cutoff_date else config.cutoff_date
-        max_date = request.max_date if request and request.max_date else config.final_cutoff_date
+        max_date = request.max_date if request and request.max_date else config.max_date
         eliminate_covid_data = request.eliminate_covid_data if request and request.eliminate_covid_data is not None else config.eliminate_covid_data
         covid_token = request.covid_token if request and request.covid_token is not None else config.covid_token
         provided_data = request.provided_data if request else None
@@ -113,15 +113,38 @@ def add_new_data(request: AddNewDataRequest = None):
 def run_model_reconstruction_job(job_id: str, payload: dict) -> None:
     try:
         _set_job_status(job_id, "running")
-        config = BaseTransformerConfig()
+        config = BaseTransformerConfig(
+            code=payload["code"],
+            head_size=payload["head_size"],
+            num_heads=payload["num_heads"],
+            ff_dim=payload["ff_dim"],
+            num_transformer_blocks=payload["num_transformer_blocks"],
+            mlp_units=payload["mlp_units"],
+            activation_function=payload["activation_function"],
+            dropout=payload["dropout"],
+            learning_rate=payload["learning_rate"],
+            epochs=payload["epochs"],
+            batch_size=payload["batch_size"],
+            cutoff_date=payload["cutoff_date"],
+            covid_token=payload["covid_token"],
+            positional_encoding=payload["positional_encoding"],
+            evaluate_model=payload["evaluate_model"],
+            data_path=payload["data_path"],
+            model_folder=payload.get("model_folder") or BaseTransformerConfig.model_folder,
+        )
         pipeline = ModelPredictionPipeline(config)
+        input_directory = payload["data_path"]
+        old_input_directory = payload.get("old_data_path") or input_directory
 
         final_output_df = pipeline.run_reconstruct_save_results_pipeline(
+            input_directory=input_directory,
+            old_input_directory=old_input_directory,
             code=payload["code"],
             LOOKBACK_LIST=payload["lookback_list"],
             FORECAST_LIST=payload["forecast_horizon_list"],
             final_output_predictions=None,
-            final_output_df=None,
+            final_output_df=pd.DataFrame(),
+            prediction_dates=payload.get("prediction_dates"),
         )
 
         output_path = payload.get("save_path") or "../production_predictions/final_output_predictions"
@@ -279,4 +302,3 @@ def read_data(data_path: str, code: str):
     """
     # Implementation for reading and preparing data
     pass
-

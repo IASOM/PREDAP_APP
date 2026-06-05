@@ -265,6 +265,10 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         Returns:
             A DataFrame containing the final output predictions for each forecast horizon along with corresponding dates.
         """
+        if final_output_df is None:
+            final_output_df = pd.DataFrame()
+        if len(LOOKBACK_LIST) != len(FORECAST_LIST):
+            raise ValueError("LOOKBACK_LIST and FORECAST_LIST must have the same length")
         
         dates = prediction_dates or ["2025-12-23","2025-12-24", "2025-12-25", "2025-12-26", "2025-12-27", "2025-12-28", "2025-12-29", "2025-12-30", "2025-12-31"]
         for max_date in dates:
@@ -434,7 +438,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
 
         return final_output_df
 
-    def save_final_output_predictions(self, final_output_df: pd.DataFrame, output_path: str = "../production_predictions/final_output_predictions"):
+    def save_final_output_predictions(self, final_output_df: pd.DataFrame, output_path: Optional[str] = None):
         """
         Saves the final output predictions DataFrame to a parquet file.
 
@@ -443,8 +447,10 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             code (str): The code for which the predictions were made, used for naming the output file.
         """
         
+        if final_output_df is None:
+            raise ValueError("final_output_df cannot be None")
+        output_path = output_path or self.config.production_predictions_dir
         table = pa.Table.from_pandas(final_output_df, preserve_index=False)
-        output_path = self.config.production_predictions_dir
 
         ds.write_dataset(
             table,

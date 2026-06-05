@@ -29,7 +29,6 @@ pickle
 pydot
 re
 seasonal_cov_models
-sklearn
 sys
 tensorflow
 time

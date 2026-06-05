@@ -45,7 +45,7 @@ class ModelReconstructionRequest(BaseModel):
     num_heads: int = Field(..., description="The number of attention heads.")
     ff_dim: int = Field(..., description="The dimensionality of the feedforward network.")
     num_transformer_blocks: int = Field(..., description="The number of transformer blocks.")
-    mlp_units: int = Field(..., description="The number of units in each MLP layer.")
+    mlp_units: List[int] = Field(..., description="The number of units in each MLP layer.")
     activation_function: str = Field(..., description="The activation function to use in the MLP layers.")
     dropout: float = Field(default=0.0, description="The dropout rate for regularization.")
     learning_rate: float = Field(default=0.001, description="The learning rate for training.")
@@ -56,4 +56,16 @@ class ModelReconstructionRequest(BaseModel):
     positional_encoding: bool = Field(default=True, description="If True, uses positional encoding in the model.")
     evaluate_model: bool = Field(default=True, description="If True, evaluates the model after training.")
     data_path: str = Field(..., description="The path to the input data directory.")
+    old_data_path: Optional[str] = Field(
+        default=None,
+        description="Optional legacy-format data path used for diagnostic covariates. Defaults to data_path."
+    )
+    model_folder: Optional[str] = Field(
+        default=None,
+        description="Directory containing quantized model weights. Uses config default if omitted."
+    )
+    prediction_dates: Optional[List[str]] = Field(
+        default=None,
+        description="Specific prediction dates to run. Uses production defaults if omitted."
+    )
     save_path: str = Field(..., description="The path to the directory where results will be saved.")

@@ -21,7 +21,7 @@ Flux recomanat:
 ```text
 TRANSFORMERS_PREDAP/
   predap_cli.py                         # CLI principal
-  scripts/predap.sh                     # wrapper Bash
+  scripts/predap.py                    # Python wrapper
   production/
     retrieve_and_reconstruct_data_pipeline.py
     model_reconstruction_pipeline.py
@@ -48,33 +48,30 @@ Des de la carpeta `TRANSFORMERS_PREDAP`:
 
 ```bash
 python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/requirements.txt
 ```
 
-En Windows amb Git Bash, el wrapper funciona igual si `python` apunta a l'entorn correcte:
+## CLI ràpida
 
-```bash
-PYTHON_BIN=.venv/Scripts/python.exe bash scripts/predap.sh --help
-```
-
-## CLI rapida
-
-Totes les comandes es poden executar des de Bash:
-
-```bash
-bash scripts/predap.sh --help
-bash scripts/predap.sh sample-data --start 2010-01-01 --end 2023-10-31
-bash scripts/predap.sh aquas -- --sample --all
-bash scripts/predap.sh train --stage univariate --code J00 --lookbacks 7,14 --forecasts 7,14
-bash scripts/predap.sh reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
-```
-
-També es pot cridar directament amb Python:
+Les comandes s'executen directament amb Python:
 
 ```bash
 python predap_cli.py --help
+python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
+python predap_cli.py aquas -- --sample --all
+python predap_cli.py train --stage univariate --code J00 --lookbacks 7,14 --forecasts 7,14
+python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
+```
+
+Per comoditat també hi ha un wrapper Python:
+
+```bash
+python scripts/predap.py --help
 ```
 
 ## 1. Obtenir dades amb AQUAS
@@ -82,19 +79,19 @@ python predap_cli.py --help
 Per executar el pipeline AQUAS integrat, fes servir el subcomandament `aquas`. Els arguments que venen despres de `aquas` es passen al runner intern `run_pipeline_optimized.py`.
 
 ```bash
-bash scripts/predap.sh aquas -- --all --start-date 2024-01-01 --end-date 2024-12-31
+python predap_cli.py aquas -- --all --start-date 2024-01-01 --end-date 2024-12-31
 ```
 
 Mode sample sense base de dades:
 
 ```bash
-bash scripts/predap.sh aquas -- --sample --all
+python predap_cli.py aquas -- --sample --all
 ```
 
 Generar un dataset sintetic multi-any:
 
 ```bash
-bash scripts/predap.sh sample-data \
+python predap_cli.py sample-data \
   --start 2010-01-01 \
   --end 2023-10-31
 ```
@@ -117,7 +114,7 @@ El training stack esta dividit en tres fases:
 Exemple curt:
 
 ```bash
-bash scripts/predap.sh train \
+python predap_cli.py train \
   --stage full \
   --codes J00,I10,M54 \
   --lookbacks 7,14 \
@@ -131,7 +128,7 @@ bash scripts/predap.sh train \
 Per entrenar nomes el model univariant:
 
 ```bash
-bash scripts/predap.sh train \
+python predap_cli.py train \
   --stage univariate \
   --code J00 \
   --lookbacks 7 \
@@ -143,7 +140,7 @@ bash scripts/predap.sh train \
 La quantitzacio carrega models des de MLflow i guarda pesos `float16` en una estructura apta per produccio.
 
 ```bash
-bash scripts/predap.sh quantize \
+python predap_cli.py quantize \
   --experiments 1.0_Production_TRANSFORMER_TRANSFORMERS_PREDAP_HYDRA_GRID_SEARCH_20260514 \
   --codes demanda__SERVEI_CODI__INF,demanda__SERVEI_CODI__MF \
   --lookbacks 7,14,60,60,182,182 \
@@ -162,7 +159,7 @@ Els pesos es guarden sota:
 `reconstruct` reconstrueix les arquitectures, carrega els pesos quantitzats i escriu prediccions particionades per codi.
 
 ```bash
-bash scripts/predap.sh reconstruct \
+python predap_cli.py reconstruct \
   --code DEMAND_demanda_SERVEI_CODI_INF \
   --data-path AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/sample/multiyear_output/finals/demand_diagnosis_joined.parquet \
   --old-data-path ../data/FINAL_DB/finals_combined.csv \

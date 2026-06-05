@@ -28,31 +28,31 @@ cd TRANSFORMERS_PREDAP
 Veure ajuda del CLI:
 
 ```bash
-bash scripts/predap.sh --help
+python predap_cli.py --help
 ```
 
 Executar el pipeline AQUAS en mode sample:
 
 ```bash
-bash scripts/predap.sh aquas -- --sample --all
+python predap_cli.py aquas -- --sample --all
 ```
 
 Generar dades sintetiques multi-any:
 
 ```bash
-bash scripts/predap.sh sample-data --start 2010-01-01 --end 2023-10-31
+python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
 ```
 
 Entrenar un model simple:
 
 ```bash
-bash scripts/predap.sh train --stage univariate --code J00 --lookback 7 --forecast 7
+python predap_cli.py train --stage univariate --code J00 --lookback 7 --forecast 7
 ```
 
 Reconstruir i predir amb models quantitzats:
 
 ```bash
-bash scripts/predap.sh reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
+python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
 ```
 
 ## On mirar els detalls

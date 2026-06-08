@@ -18,6 +18,7 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from utils.experiments_utils import smart_read
 
 
 # Import necessary modules
@@ -241,7 +242,7 @@ class DiagnosticResidualTransformerPipeline:
         
         # Load and split the original data for covariate extraction
         train_split, test_split = split_train_test(
-            pd.read_csv(self.data_path), 
+            smart_read(self.data_path), 
             split_ratio=0.8, 
             cutoff_date = self.config.cutoff_date,
             max_date = self.config.final_cutoff_date,
@@ -417,7 +418,7 @@ class DiagnosticResidualTransformerPipeline:
         print("="*50)
         
         # Get original scale data for visualization
-        original_scale_df = pd.read_csv(self.data_path)
+        original_scale_df = smart_read(self.data_path)
 
         test_timestamp = data_preparation.extract_dates(self.data_path, 
                                        self.config.code, 

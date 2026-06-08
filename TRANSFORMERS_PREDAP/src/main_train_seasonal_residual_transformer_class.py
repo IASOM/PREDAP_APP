@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from univariate_transformer import CustomCosineDecay
+from utils.experiments_utils import smart_read
 
 # Add the src directory to path for module imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -233,7 +234,7 @@ class SeasonalResidualTransformerPipeline:
         print("="*50)
         
         
-        df = pd.read_csv(self.data_path)
+        df = smart_read(self.data_path)
         # Prepare seasonal features for training data
         print("Preparing seasonal features for training data...")
         df_processed = data_preparation.prepare_time_series_features(
@@ -403,7 +404,7 @@ class SeasonalResidualTransformerPipeline:
         print("="*50)
 
         # Get original scale data for visualization
-        original_scale_df = pd.read_csv(self.data_path)
+        original_scale_df = smart_read(self.data_path)
 
         test_timestamp = data_preparation.extract_dates(self.data_path, 
                                        self.config.code, 

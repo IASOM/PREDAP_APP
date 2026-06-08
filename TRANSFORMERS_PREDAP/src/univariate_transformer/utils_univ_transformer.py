@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 import tensorflow as tf
+from utils.experiments_utils import smart_read
 
 
 import mlflow
@@ -214,7 +215,7 @@ def load_and_preprocess_data(data_path, target_code="T14", date_cutoff='2010-01-
         pd.DataFrame: Preprocessed dataframe
     """
     # Load data
-    df = pd.read_csv(data_path, index_col=0)
+    df = smart_read(data_path, index_col=0)
     
     # Create COVID-19 combined code
     if 'B34' in df.columns and 'U07' in df.columns:

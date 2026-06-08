@@ -10,6 +10,7 @@ from sklearn.preprocessing import FunctionTransformer
 
 from config.base_transformer_config import BaseTransformerConfig
 from data_utils import data_preparation
+from utils.experiments_utils import smart_read
 
 
 default_config = BaseTransformerConfig()
@@ -40,7 +41,7 @@ class DataPreparationInProduction:
         covid_dates: Optional[List[str]] = None,
     ):
         code = code.replace("#", ":")
-        df = pd.read_csv(data_path)
+        df = smart_read(data_path)
         if eliminate_covid_data:
             if covid_dates is None:
                 raise ValueError("covid_dates must be provided when eliminate_covid_data=True")
@@ -103,7 +104,7 @@ class DataPreparationInProduction:
     ):
         relevant_feature_cols = self.load_diagnostic_covariates(default_config.diagnostic_covariates_path, code, forecast)
         code = code.replace("#", ":")
-        df = pd.read_csv(data_path)
+        df = smart_read(data_path)
         if eliminate_covid_data:
             if covid_dates is None:
                 raise ValueError("covid_dates must be provided when eliminate_covid_data=True")
@@ -167,7 +168,7 @@ class DataPreparationInProduction:
         predictions_test: Optional[np.ndarray],
         scaler: FunctionTransformer,
     ):
-        df = pd.read_csv(data_path)
+        df = smart_read(data_path)
         print("Preparing seasonal features for training data...")
         df_processed = data_preparation.prepare_time_series_features(
             df,

@@ -7,6 +7,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolu
 import pandas as pd
 import numpy as np
 import time
+from utils.experiments_utils import smart_read
 
 
 # Add the src directory to path for module imports
@@ -83,7 +84,7 @@ def evaluate_univ_transformer(model_name, input_directory, code,  cutoff_date, m
                                                eliminate_covid_data=eliminate_covid_data, 
                                                covid_dates=covid_dates)
 
-    original_scale_df = pd.read_csv(input_directory)
+    original_scale_df = smart_read(input_directory)
     # Get predictions
     predictions = model.predict(X_test, verbose=0)
 

@@ -72,7 +72,7 @@ def initialize_results_tracking(results_dir: str, codes_list) -> dict:
 
 def load_json_codes_list(json_path: str) -> str:
     """Load a list from JSON and return as comma-separated string for Hydra sweep."""
-    with open(json_path, 'r') as f:
+    with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     #codes_list = data[key]
     # Return comma-separated string for Hydra sweep parameters

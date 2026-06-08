@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import FunctionTransformer
 from typing import List, Optional, Tuple
+from utils.experiments_utils import smart_read
 from data_utils import data_preparation
 from config.base_transformer_config import BaseTransformerConfig
 
@@ -60,8 +61,8 @@ class DataPreparationInProduction:
             df_timestamp: A pandas Series containing the timestamps corresponding to the input features and target valuesç
         """
         code = code.replace("#", ":")
-        # Load CSV
-        df = pd.read_csv(data_path)
+        # Load CSV or Parquet
+        df = smart_read(data_path)
         if eliminate_covid_data:
             assert covid_dates is not None
             df = data_preparation.eliminate_covid_dates(df, covid_dates)
@@ -137,8 +138,8 @@ class DataPreparationInProduction:
         """
         relevant_feature_cols = self.load_diagnostic_covariates(default_config.diagnostic_covariates_path, code, forecast)
         code = code.replace("#", ":")
-        # Load CSV
-        df = pd.read_csv(data_path)
+        # Load CSV or Parquet
+        df = smart_read(data_path)
         if eliminate_covid_data:
             assert covid_dates is not None
             df = data_preparation.eliminate_covid_dates(df, covid_dates)
@@ -215,7 +216,7 @@ class DataPreparationInProduction:
         Returns:
             X_seasonal_covs: A numpy array containing the input features for the seasonal covariates, prepared for the specified code and forecast horizon.
         """
-        df = pd.read_csv(data_path)
+        df = smart_read(data_path)
         # Prepare seasonal features for training data
 
         print("Preparing seasonal features for training data...")

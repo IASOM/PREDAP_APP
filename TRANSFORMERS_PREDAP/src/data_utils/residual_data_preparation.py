@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+from utils.experiments_utils import smart_read
 
 from data_utils import data_preparation
 from data_utils.data_preparation import split_train_test
@@ -41,7 +41,7 @@ def prepare_diagnostic_covariate_data(config):
     
     # Load and split the original data for covariate extraction
     train_split, test_split = split_train_test(
-        pd.read_csv(config.data_path), 
+        smart_read(config.data_path), 
         split_ratio=0.8, 
         cutoff_date = config.cutoff_date,
         max_date = config.final_cutoff_date,

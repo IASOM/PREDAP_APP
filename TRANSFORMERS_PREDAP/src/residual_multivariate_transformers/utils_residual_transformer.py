@@ -11,6 +11,7 @@ import numpy as np
 import sys
 import os
 import time
+from utils.experiments_utils import smart_read
 
 from sklearn.preprocessing import MinMaxScaler
 
@@ -229,7 +230,7 @@ def load_and_preprocess_data(data_path, target_code=None, split_ratio=None):
         raise FileNotFoundError(f"Data file not found: {data_path}")
     
     # Load the data
-    df = pd.read_csv(data_path)
+    df = smart_read(data_path)
     print(f"Loaded data shape: {df.shape}")
     
     if target_code:

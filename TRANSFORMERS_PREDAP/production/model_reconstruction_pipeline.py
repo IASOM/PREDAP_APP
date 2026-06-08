@@ -645,8 +645,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             print(f"No existing metrics dataframe found at: {metrics_df_path}. A new one will be created.")
             metrics_df = pd.DataFrame(columns=['code', 'date', 'MAE', 'MSE', 'RMSE', 'WAPE'])
             
-        
-        real_data_dataset = pd.read_csv(real_data_dataset_path) if real_data_dataset_path else None
+        real_data_dataset = smart_read(real_data_dataset_path) if real_data_dataset_path else None
 
         my_schema = pa.schema([("code", pa.string())])
 

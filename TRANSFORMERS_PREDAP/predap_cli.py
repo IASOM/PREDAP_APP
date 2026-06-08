@@ -12,6 +12,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parent
 SRC_ROOT = REPO_ROOT / "src"
 AQUAS_ROOT = REPO_ROOT / "AQUAS_DATA_RETRIEVAL" / "AQUAS_DATA_RETRIEVAL-main"
+DEFAULT_DATA_PATH = AQUAS_ROOT / "data" / "sample" / "multiyear_output" / "finals" / "demand_diagnosis_joined.parquet"
 
 
 class PredapHelpFormatter(
@@ -308,7 +309,7 @@ def add_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--forecast", type=int, default=7, help="Single forecast horizon, in days.")
     parser.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. Must match --forecasts length.")
     parser.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. Must match --lookbacks length.")
-    parser.add_argument("--data-path", type=Path, default=REPO_ROOT.parent / "data" / "FINAL_DB" / "full_CAT1.parquet", help="Input dataset used for training or reconstruction.")
+    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Input dataset used for training or reconstruction.")
     parser.add_argument("--model-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Folder containing model outputs or quantized weights.")
     parser.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for training/evaluation.")
     parser.add_argument("--covid-token", action=argparse.BooleanOptionalAction, default=True, help="Enable or disable the COVID indicator feature.")

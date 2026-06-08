@@ -19,17 +19,78 @@ En resum: AQUAS s'encarrega de les dades; TRANSFORMERS_PREDAP s'encarrega dels m
 
 ## Comencar rapid
 
-Entra al projecte principal:
+### 1. Entra al projecte principal
 
 ```bash
 cd TRANSFORMERS_PREDAP
 ```
 
-Veure ajuda del CLI:
+### 2. Crea un entorn virtual
+
+Fes servir sempre un entorn virtual local. Aixi evitem barrejar dependencies del sistema amb les del projecte.
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+```
+
+Windows cmd:
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+python -m pip install --upgrade pip setuptools wheel
+```
+
+macOS/Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+```
+
+### 3. Instal.la dependencies
+
+Instal.la primer el projecte de models i despres el pipeline AQUAS integrat:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -r AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/requirements.txt
+```
+
+Si nomes vols generar documentacio:
+
+```bash
+python -m pip install -r docs-requirements.txt
+```
+
+### 4. Comprova que el CLI respon
 
 ```bash
 python predap_cli.py --help
 ```
+
+El CLI te aquests metodes principals:
+
+- `aquas`: executa el pipeline AQUAS integrat.
+- `sample-data`: genera dades sintetiques locals.
+- `train`: entrena models univariants, residuals o el stack complet.
+- `quantize`: converteix models entrenats en pesos quantitzats de produccio.
+- `reconstruct`: reconstrueix models quantitzats i genera prediccions.
+
+Per veure totes les opcions d'un metode concret:
+
+```bash
+python predap_cli.py train --help
+python predap_cli.py reconstruct --help
+python predap_cli.py quantize --help
+```
+
+## Exemples basics
 
 Executar el pipeline AQUAS en mode sample:
 
@@ -55,6 +116,45 @@ Reconstruir i predir amb models quantitzats:
 python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
 ```
 
+## Instal.lacio estable entre maquines
+
+Per reduir problemes quan el projecte es mou entre portatils, servidors o contenidors:
+
+1. Fes servir la mateixa versio minor de Python a totes les maquines. Per aquest projecte es recomanable treballar amb Python 3.11 o 3.12 si alguna dependencia de ML falla amb versions mes noves.
+2. No instal.lis dependencies al Python global. Activa sempre `.venv` abans d'executar `pip`, `pytest`, `mlflow` o `predap_cli.py`.
+3. Instal.la amb `python -m pip ...` en comptes de `pip ...`; aixi queda clar quin Python esta rebent les dependencies.
+4. Si una maquina no te GPU/NVIDIA preparada, valida especialment la dependencia `tensorflow` del `requirements.txt`. En servidors de produccio, millor replicar la mateixa imatge Docker o el mateix lockfile.
+5. Quan tinguis una maquina validada, congela l'entorn:
+
+```bash
+python -m pip freeze > requirements-lock.txt
+```
+
+I en una altra maquina replica exactament aquell entorn:
+
+```bash
+python -m pip install -r requirements-lock.txt
+```
+
+6. Mantingues les dades grans fora de git. Les carpetes `data/`, `quantized_models/`, `mlruns/` i sortides de produccio han de ser artefactes locals o de servidor.
+
+El projecte separa tres escenaris:
+
+- `TRANSFORMERS_PREDAP/requirements.txt`: instal.lacio local CPU amb `tensorflow-cpu`.
+- `TRANSFORMERS_PREDAP/requirements-gpu.txt`: instal.lacio Linux/WSL2 amb GPU via pip.
+- `TRANSFORMERS_PREDAP/requirements-docker.txt`: instal.lacio dins Docker NVIDIA; no inclou TensorFlow perque la imatge base ja el porta.
+
+Per desplegar amb Docker i GPU, mira `TRANSFORMERS_PREDAP/docs/deployment/docker.md`.
+
+Checklist de verificacio despres d'instal.lar:
+
+```bash
+python --version
+python -m pip check
+python predap_cli.py --help
+python predap_cli.py sample-data --help
+```
+
 ## On mirar els detalls
 
 - Guia principal del projecte: `TRANSFORMERS_PREDAP/README.md`
@@ -64,4 +164,4 @@ python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --predict
 
 ## Notes
 
-Aquest README nomes fa de mapa general de la supercarpeta. Per instal.lacio, dependencies, entrenament complet, quantitzacio i produccio, consulta el README de `TRANSFORMERS_PREDAP/`.
+Aquest README fa de mapa general de la supercarpeta i dona la instal.lacio basica. Per entrenament complet, quantitzacio, reconstruccio i produccio, consulta el README de `TRANSFORMERS_PREDAP/`.

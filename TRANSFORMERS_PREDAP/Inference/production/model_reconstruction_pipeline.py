@@ -13,7 +13,7 @@ import pyarrow.dataset as ds
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from sklearn.pipeline import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer
 
 from config.base_transformer_config import BaseTransformerConfig
 from production.data_preparation_in_poduction import DataPreparationInProduction

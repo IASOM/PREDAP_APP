@@ -1,18 +1,27 @@
-# Use an official light python image 
+# NVIDIA TensorFlow image with CUDA/cuDNN/TensorRT and TensorFlow preinstalled.
 FROM nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 
-
-#Stablish the working directory inside the container
 WORKDIR /app
 
-RUN mkdir -p /app/${MODELS_FOLDER_NAME} && mkdir -p /app/${DATA_FOLDER_NAME} && mkdir -p /app/${SAVE_DATA_FOLDER_NAME}
+ARG MODELS_FOLDER_NAME=quantized_models
+ARG READ_DATA_FOLDER_NAME=data
+ARG SAVE_DATA_FOLDER_NAME=production_predictions
 
-# Copy requirements and install them
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV MODELS_FOLDER_NAME=${MODELS_FOLDER_NAME}
+ENV READ_DATA_FOLDER_NAME=${READ_DATA_FOLDER_NAME}
+ENV SAVE_DATA_FOLDER_NAME=${SAVE_DATA_FOLDER_NAME}
 
-# Copy the rest of your code
+RUN mkdir -p \
+    /app/${MODELS_FOLDER_NAME} \
+    /app/${READ_DATA_FOLDER_NAME} \
+    /app/${SAVE_DATA_FOLDER_NAME}
+
+# Do not install tensorflow here: the NVIDIA base image already provides it.
+COPY requirements-docker.txt .
+RUN python -m pip install --no-cache-dir -r requirements-docker.txt
+
 COPY . .
 
-#Command to run FastAPI 
+EXPOSE 8000
+
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

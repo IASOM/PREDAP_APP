@@ -1,7 +1,6 @@
 fastapi==0.135.2
 h5py
 hydra-core==1.3.2
-keras>=3,<4
 matplotlib
 mlflow
 numpy>=1.26,<2
@@ -15,6 +14,5 @@ scikit-learn>=1.4,<1.9
 scipy
 seaborn
 SQLAlchemy==2.0.48
-tensorflow-cpu>=2.16,<2.18
 redis==5.2.1
 uvicorn[standard]>=0.30

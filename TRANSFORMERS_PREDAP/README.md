@@ -56,6 +56,17 @@ pip install -r requirements.txt
 pip install -r AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/requirements.txt
 ```
 
+Per defecte `requirements.txt` instal.la TensorFlow CPU (`tensorflow-cpu`). Aixo es el mes portable per Windows, macOS i servidors sense GPU.
+
+Si vols instal.lar TensorFlow amb GPU via pip en Linux/WSL2:
+
+```bash
+pip install -r requirements-gpu.txt
+pip install -r AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/requirements.txt
+```
+
+Per Docker NVIDIA no facis servir `requirements.txt`: la imatge base ja porta TensorFlow, CUDA i cuDNN. El Dockerfile utilitza `requirements-docker.txt`, que exclou TensorFlow per no substituir la build optimitzada d'NVIDIA.
+
 ## CLI ràpida
 
 Les comandes s'executen directament amb Python:
@@ -73,6 +84,53 @@ Per comoditat també hi ha un wrapper Python:
 ```bash
 python scripts/predap.py --help
 ```
+
+## Docker NVIDIA
+
+La ruta Docker recomanada per GPU es:
+
+```bash
+cd TRANSFORMERS_PREDAP
+docker compose build
+docker compose up -d
+docker compose logs -f mi-api-ia
+```
+
+La API queda exposada nomes a localhost:
+
+```text
+http://127.0.0.1:8000
+```
+
+El `dockerfile` parteix de `nvcr.io/nvidia/tensorflow:25.02-tf2-py3`, que ja inclou TensorFlow 2.17.0, Python 3.12.3, CUDA i cuDNN. Per aixo `requirements-docker.txt` no inclou ni `tensorflow` ni `keras`.
+
+Abans d'aixecar Docker revisa `.env`:
+
+```env
+MODELS_FOLDER_NAME=quantized_models
+READ_DATA_FOLDER_NAME=data
+SAVE_DATA_FOLDER_NAME=production_predictions
+
+RELATIVE_MODELS_PATH=../quantized_models
+RELATIVE_READ_DATA_PATH=../data
+RELATIVE_SAVE_DATA_PATH=../production_predictions
+```
+
+I comprova que existeixen les carpetes muntades:
+
+```bash
+mkdir -p ../quantized_models ../data ../production_predictions
+```
+
+En Windows, si no executes Docker des de WSL2, crea aquestes carpetes manualment o adapta els paths del `.env`.
+
+Per verificar GPU dins el container:
+
+```bash
+docker compose exec mi-api-ia python -c "import tensorflow as tf; print(tf.__version__); print(tf.config.list_physical_devices('GPU'))"
+```
+
+Si la llista de GPU surt buida, revisa que el host tingui drivers NVIDIA, Docker Desktop/Engine amb suport GPU i NVIDIA Container Toolkit.
 
 ## 1. Obtenir dades amb AQUAS
 

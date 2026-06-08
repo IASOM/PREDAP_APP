@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.pipeline import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer
 
 from config.base_transformer_config import BaseTransformerConfig
 from data_utils import data_preparation

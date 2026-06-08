@@ -3,7 +3,7 @@ import re
 
 import keras
 import mlflow
-from sklearn.pipeline import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer
 import tensorflow as tf
 import numpy as np
 import os

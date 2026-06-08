@@ -1,131 +1,166 @@
-# Docker Containers
+# Docker
 
-Predap can be containerized for reproducible deployment across environments.
+PREDAP uses Docker for reproducible GPU deployment of the FastAPI service and production reconstruction workflows.
 
----
-
-## Dockerfile
+The project Dockerfile is based on:
 
 ```dockerfile
-FROM tensorflow/tensorflow:2.15.0-gpu
-
-WORKDIR /app
-
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project
-COPY . .
-
-# Expose API port
-EXPOSE 8000
-
-# Default: run the FastAPI server
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+FROM nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 ```
 
----
+This NVIDIA NGC image already includes TensorFlow 2.17.0, Python 3.12.3, CUDA, cuDNN and TensorRT. For that reason, Docker installs `requirements-docker.txt`, not `requirements.txt`. Do not install `tensorflow==2.17.0+nv25.2` with normal pip; that build belongs to the NVIDIA container stack.
 
-## Docker Compose
+## Requirement Files
 
-For a full stack with MLflow tracking:
+| File | Use |
+| --- | --- |
+| `requirements.txt` | Local CPU install. Uses `tensorflow-cpu>=2.16,<2.18`. |
+| `requirements-gpu.txt` | Linux/WSL2 GPU install via pip. Uses `tensorflow[and-cuda]>=2.17,<2.18`. |
+| `requirements-docker.txt` | Docker NVIDIA install. Excludes `tensorflow` and `keras` because the base image provides them. |
+| `Inference/requirements.txt` | Lightweight CPU inference environment. |
 
-```yaml
-version: "3.8"
+`scikit-learn` is included as `scikit-learn>=1.4,<1.9`. The code uses stable preprocessing and metrics APIs such as `MinMaxScaler`, `FunctionTransformer`, `mean_absolute_error` and `mean_squared_error`, so it does not need to force only the newest scikit-learn release.
 
-services:
-  predap-api:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./mlruns:/app/mlruns
-      - ./production_predictions:/app/production_predictions
-    environment:
-      - MLFLOW_TRACKING_URI=file:./mlruns
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+## Compose Environment
 
-  mlflow-ui:
-    image: ghcr.io/mlflow/mlflow:v2.10.0
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./mlruns:/mlruns
-    command: >
-      mlflow ui
-      --backend-store-uri file:///mlruns
-      --host 0.0.0.0
-      --port 5000
+`docker-compose.yml` reads these values from `.env`:
+
+```env
+MODELS_FOLDER_NAME=quantized_models
+READ_DATA_FOLDER_NAME=data
+SAVE_DATA_FOLDER_NAME=production_predictions
+
+RELATIVE_MODELS_PATH=../quantized_models
+RELATIVE_READ_DATA_PATH=../data
+RELATIVE_SAVE_DATA_PATH=../production_predictions
 ```
 
-### Running
+The host paths on the left are mounted into `/app/<folder>` inside the container:
+
+| Host path | Container path | Purpose |
+| --- | --- | --- |
+| `../quantized_models` | `/app/quantized_models` | Quantized model weights. |
+| `../data` | `/app/data` | Input datasets. |
+| `../production_predictions` | `/app/production_predictions` | Prediction outputs and production artifacts. |
+
+Create the host folders before starting Compose:
 
 ```bash
-# Build and start
+mkdir -p ../quantized_models ../data ../production_predictions
+```
+
+On Windows without WSL2, create these folders manually or change `.env` to paths that Docker Desktop can mount.
+
+## Start The API
+
+From `TRANSFORMERS_PREDAP`:
+
+```bash
+docker compose build
 docker compose up -d
+docker compose logs -f mi-api-ia
+```
 
-# View logs
-docker compose logs -f predap-api
+The API is exposed only on localhost:
 
-# Stop
+```text
+http://127.0.0.1:8000
+```
+
+Redis is also started by Compose and is exposed only on localhost:
+
+```text
+127.0.0.1:6379
+```
+
+Stop the stack with:
+
+```bash
 docker compose down
 ```
 
----
+## GPU Requirements
 
-## Training Container
+The Compose service reserves one NVIDIA GPU:
 
-For training jobs (not serving), override the entrypoint:
-
-```bash
-# Single training run
-docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/mlruns:/app/mlruns \
-    predap:latest python main.py
-
-# Hydra grid search
-docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/mlruns:/app/mlruns \
-    predap:latest python main_experiments_hydra.py --multirun \
-    model.target_code=J00,B34 experiment_setup=7_7,14_14
+```yaml
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
 ```
 
----
+The host machine needs:
 
-## GPU Configuration
+1. NVIDIA driver compatible with the NGC TensorFlow 25.02 image.
+2. Docker Engine or Docker Desktop with GPU support.
+3. NVIDIA Container Toolkit on Linux/WSL2.
 
-| Runtime | Flag | Notes |
-|---------|------|-------|
-| Docker CLI | `--gpus all` | Requires NVIDIA Container Toolkit |
-| Docker Compose | `deploy.resources.reservations.devices` | See compose example above |
-| CPU-only | No GPU flags | TensorFlow falls back to CPU automatically |
+Verify TensorFlow and GPU visibility inside the running container:
 
-!!! tip "NVIDIA Container Toolkit"
-    Install the toolkit to enable GPU passthrough:
-    ```bash
-    sudo apt-get install -y nvidia-container-toolkit
-    sudo systemctl restart docker
-    ```
+```bash
+docker compose exec mi-api-ia python -c "import tensorflow as tf; print(tf.__version__); print(tf.config.list_physical_devices('GPU'))"
+```
 
----
+Expected TensorFlow version:
 
-## Volume Mounts
+```text
+2.17.0
+```
 
-| Host Path | Container Path | Purpose |
-|-----------|---------------|---------|
-| `./data` | `/app/data` | Input datasets (`.parquet`) |
-| `./models` | `/app/models` | Saved model weights (`.keras`, `.h5`) |
-| `./mlruns` | `/app/mlruns` | MLflow experiment tracking |
-| `./production_predictions` | `/app/production_predictions` | Production inference outputs |
+If the GPU list is empty, first verify the host:
+
+```bash
+nvidia-smi
+```
+
+Then verify Docker GPU passthrough:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi
+```
+
+## CPU-Only Alternative
+
+For local CPU development, do not use the NVIDIA Docker route. Use a virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+## Training Jobs
+
+For one-off training or CLI commands, reuse the built image and mount the same folders:
+
+```bash
+docker compose run --rm mi-api-ia python predap_cli.py --help
+docker compose run --rm mi-api-ia python predap_cli.py reconstruct --code J00 --prediction-start 2025-12-23 --prediction-end 2025-12-31
+```
+
+For direct `docker run` usage:
+
+```bash
+docker build -t predap-api .
+docker run --rm --gpus all -p 127.0.0.1:8000:8000 ^
+  -v "%cd%\..\quantized_models:/app/quantized_models" ^
+  -v "%cd%\..\data:/app/data" ^
+  -v "%cd%\..\production_predictions:/app/production_predictions" ^
+  predap-api
+```
+
+Use the equivalent `$(pwd)` syntax on Linux/WSL2.

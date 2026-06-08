@@ -7,7 +7,12 @@ services:
       - "127.0.0.1:6379:6379" # Expone el puerto 6379 SOLO a nivel local (seguridad)
     command: ["redis-server", "--appendonly", "yes"]
   mi-api-ia:
-    build: .
+    build:
+      context: .
+      args:
+        MODELS_FOLDER_NAME: ${MODELS_FOLDER_NAME:-quantized_models}
+        READ_DATA_FOLDER_NAME: ${READ_DATA_FOLDER_NAME:-data}
+        SAVE_DATA_FOLDER_NAME: ${SAVE_DATA_FOLDER_NAME:-production_predictions}
     restart: always # Si el servidor se reinicia, tu API también lo hará
     ports:
       - "127.0.0.1:8000:8000" # Expone el puerto 8000 SOLO a nivel local (seguridad)

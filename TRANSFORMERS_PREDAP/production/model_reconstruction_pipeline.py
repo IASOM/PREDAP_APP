@@ -1,6 +1,6 @@
 import shutil
 
-from sklearn.pipeline import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer
 import numpy as np
 import pandas as pd
 import tensorflow as tf

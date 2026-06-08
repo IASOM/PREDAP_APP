@@ -7,6 +7,10 @@ import pandas as pd
 from src.data_utils.features import (
     cut_dataframe
 )
+from src.data_utils.features import (
+    cut_dataframe,
+    prepare_time_series_features,
+)
 
 #from src.data_utils.loader import read as read_csv
 from src.utils.experiments_utils import smart_read as read_csv

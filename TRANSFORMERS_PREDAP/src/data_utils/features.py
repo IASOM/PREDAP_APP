@@ -29,20 +29,32 @@ def add_covid_token(df: pd.DataFrame) -> pd.DataFrame:
         df.loc[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date), 'covid_token'] = 1
     return df
 
-def cut_dataframe(df: pd.DataFrame, date_cutoff: str = "2010-01-01", max_date: str = '2026-12-31') -> pd.DataFrame:
+def cut_dataframe(
+    df: pd.DataFrame,
+    date_cutoff: str = "2010-01-01",
+    max_date: str = "2026-12-31",
+    csv_file: str = None,
+    save_data: bool = False,
+) -> pd.DataFrame:
     """Cuts the DataFrame to include only rows between the specified cutoff and max dates.
-    Parameters: 
-        -----------
-        df : pd.DataFrame
-            The input DataFrame containing a 'timestamp' column.
-        date_cutoff : str
-            The start date (inclusive) for filtering the DataFrame, in 'YYYY-MM-DD' format.
-        max_date : str
-            The end date (inclusive) for filtering the DataFrame, in 'YYYY-MM-DD' format.
+
+    Backwards-compatible signature: older call-sites may pass `csv_file` and `save_data`.
+    These extra parameters are accepted but currently ignored by this implementation.
+
+    Parameters:
+    - df : pd.DataFrame
+        The input DataFrame containing a 'timestamp' column.
+    - date_cutoff : str
+        The start date (inclusive) for filtering the DataFrame, in 'YYYY-MM-DD' format.
+    - max_date : str
+        The end date (inclusive) for filtering the DataFrame, in 'YYYY-MM-DD' format.
+    - csv_file : str, optional
+        Legacy parameter — path to the original file (ignored).
+    - save_data : bool, optional
+        Legacy parameter — whether to save the cut dataframe (ignored).
+
     Returns:
-        --------    
-        df: pd.DataFrame
-            A filtered DataFrame containing only rows with timestamps between the cutoff and max
+    - pd.DataFrame: A filtered DataFrame containing only rows with timestamps between the cutoff and max.
     """
     if "timestamp" not in df.columns:
         raise KeyError("Expected a 'timestamp' column in the CSV.")

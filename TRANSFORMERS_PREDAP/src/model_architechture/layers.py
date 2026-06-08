@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class PositionalEncoding(layers.Layer):
     def __init__(self, sequence_length, d_model, **kwargs):
         super().__init__(**kwargs)
@@ -69,7 +69,7 @@ class CustomCosineDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
         return decayed
 
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class RevIN(layers.Layer):
     def __init__(self, eps=1e-5, detach_grad=False, **kwargs):
         super(RevIN, self).__init__(**kwargs)

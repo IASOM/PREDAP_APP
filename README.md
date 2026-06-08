@@ -146,6 +146,37 @@ El projecte separa tres escenaris:
 
 Per desplegar amb Docker i GPU, mira `TRANSFORMERS_PREDAP/docs/deployment/docker.md`.
 
+## Docker rapid
+
+Per llançar la API amb Docker NVIDIA/GPU des de la carpeta arrel `PREDAP_APP`:
+
+```bash
+cd TRANSFORMERS_PREDAP
+docker compose build
+docker compose up -d
+docker compose logs -f mi-api-ia
+```
+
+La API queda disponible a:
+
+```text
+http://127.0.0.1:8000
+```
+
+Abans d'aixecar-la, comprova que existeixen aquestes carpetes al nivell de `PREDAP_APP`:
+
+```text
+data/
+quantized_models/
+production_predictions/
+```
+
+Per parar-ho:
+
+```bash
+docker compose down
+```
+
 Checklist de verificacio despres d'instal.lar:
 
 ```bash

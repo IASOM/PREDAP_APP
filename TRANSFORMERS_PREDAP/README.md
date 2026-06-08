@@ -87,10 +87,9 @@ python scripts/predap.py --help
 
 ## Docker NVIDIA
 
-La ruta Docker recomanada per GPU es:
+Des de la carpeta `TRANSFORMERS_PREDAP`, la ruta Docker recomanada per GPU es:
 
 ```bash
-cd TRANSFORMERS_PREDAP
 docker compose build
 docker compose up -d
 docker compose logs -f mi-api-ia

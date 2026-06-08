@@ -38,7 +38,7 @@ def transformer_encoder(inputs, head_size=None, num_heads=None, ff_dim=None, dro
     return x + res
 
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class PositionalEncoding(layers.Layer):
     def __init__(self, sequence_length, d_model, **kwargs):
         super().__init__(**kwargs)
@@ -59,7 +59,7 @@ class PositionalEncoding(layers.Layer):
         return x + self.pos_encoding[:, :seq_len, :]
 
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class RevIN(layers.Layer):
     def __init__(self, eps=1e-5, detach_grad=False, **kwargs):
         super().__init__(**kwargs)
@@ -156,7 +156,7 @@ class CustomCosineDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
         }
 
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class PositionalEncoding(layers.Layer):
     def __init__(self, sequence_length, d_model, **kwargs):
         super().__init__(**kwargs)
@@ -177,7 +177,7 @@ class PositionalEncoding(layers.Layer):
         return x + self.pos_encoding[:, :seq_len, :]
 
 
-@keras.saving.register_keras_serializable(package="predap")
+@keras.utils.register_keras_serializable(package="predap")
 class RevIN(layers.Layer):
     def __init__(self, eps=1e-5, detach_grad=False, **kwargs):
         super().__init__(**kwargs)

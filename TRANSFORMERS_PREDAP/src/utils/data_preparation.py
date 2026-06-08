@@ -14,8 +14,6 @@ from src.data_utils.features import (
     eliminate_covid_dates,
     add_covid_token,
     prepare_time_series_features,
-    prepare_time_series_covariates,
-    subset_df_covs_by_index,
 )
 from src.data_utils.sequences import generate_rolling_sequences_covariates, shift_covariates
 
@@ -46,8 +44,8 @@ def cut_dataframe(df: pd.DataFrame, date_cutoff: str = "2010-01-01", max_date: s
 def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', max_date = '2021-06-30', covid_token = False, relevant_feature_cols = None,train = True, debug=False, univariate=True, scaler = None, eliminate_covid_data = False, covid_dates = None):
     code = code.replace("#", ":")
     start_time =time.time()
-    # Load CSV
-    df = pd.read_csv(csv_file)
+    # Load CSV or Parquet
+    df = read_csv(csv_file)
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)

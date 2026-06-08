@@ -19,7 +19,7 @@ from utils_Gcausal import (
 )
 
 # --- Load and smooth data ---
-df = pd.read_csv('synthetic_timeseries.csv', index_col=0)
+df = smart_read('synthetic_timeseries.csv', index_col=0)
 df.index = pd.date_range(start="2010-01-01", periods=len(df), freq="D")
 df = df.clip(lower=0)
 

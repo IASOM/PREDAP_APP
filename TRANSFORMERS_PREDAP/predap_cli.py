@@ -29,6 +29,18 @@ def _ensure_local_imports() -> None:
             sys.path.insert(0, path_text)
 
 
+# Ensure local imports early so we can safely override pandas CSV reader before other modules import it.
+_ensure_local_imports()
+try:
+    from src.utils.experiments_utils import smart_read
+    import pandas as pd
+    pd.read_csv = smart_read
+except Exception:
+    # If importing the smart reader fails (e.g., missing heavy deps in minimal environments),
+    # silently continue — call-sites still may import and use `smart_read` explicitly.
+    pass
+
+
 def _csv_ints(value: str) -> list[int]:
     try:
         return [int(item.strip()) for item in value.split(",") if item.strip()]

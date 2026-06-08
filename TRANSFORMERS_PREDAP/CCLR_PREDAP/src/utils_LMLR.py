@@ -64,7 +64,7 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     # Go up one level to the project root, then into data folder
     data_path = os.path.join(script_dir, '..', 'data', 'synthetic_timeseries.csv')
-    df = pd.read_csv(data_path, index_col=0)
+    df = smart_read(data_path, index_col=0)
     df.index = pd.date_range(start="2010-01-01", periods=len(df), freq="D")
     df = df.clip(lower=0)
 

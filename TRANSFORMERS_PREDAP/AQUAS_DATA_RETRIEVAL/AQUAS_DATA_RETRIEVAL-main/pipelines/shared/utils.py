@@ -47,7 +47,7 @@ def ensure_daily_range(
 def load_output_matrix(path: str | Path) -> pd.DataFrame:
     """Load output matrix from CSV file with datetime index."""
     path = Path(path)
-    df = pd.read_csv(path, index_col="Timestamp")
+    df = smart_read(path, index_col="Timestamp")
     df.index = pd.to_datetime(df.index)
     return df.sort_index()
 
@@ -112,7 +112,7 @@ def load_last_date_from_output(final_file: str | Path) -> Optional[pd.Timestamp]
         return None
 
     try:
-        df = pd.read_csv(final_file, index_col="Timestamp")
+        df = smart_read(final_file, index_col="Timestamp")
     except Exception:
         return None
 

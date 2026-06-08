@@ -19,7 +19,7 @@ from src.utils_LMLR import (
 
 # --- Load and preprocess data ---
 print("[INFO] Loading data...")
-df = pd.read_csv('CCLR_PREDAP/data/synthetic_timeseries.csv', index_col=0)
+df = smart_read('CCLR_PREDAP/data/synthetic_timeseries.csv', index_col=0)
 df.index = pd.date_range(start="2010-01-01", periods=len(df), freq="D")
 df = df.clip(lower=0)
 

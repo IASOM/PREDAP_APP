@@ -332,7 +332,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
 
 def get_codes_list(input_directory: str) -> List[str]:
     if input_directory.endswith(".csv"):
-        df = pd.read_csv(input_directory, nrows=1000)
+        df = smart_read(input_directory, nrows=1000)
     elif input_directory.endswith(".parquet"):
         df = pd.read_parquet(input_directory, engine="pyarrow")
     else:

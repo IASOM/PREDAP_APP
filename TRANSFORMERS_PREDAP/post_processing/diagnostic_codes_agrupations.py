@@ -620,7 +620,7 @@ if __name__ == "__main__":
 
 
     # Example usage
-    df = pd.read_csv('../data/date_2008-01-01_longitudinalitat_DIAGNOSTICS_GROUPED_timestamp.csv')
+    df = smart_read('../data/date_2008-01-01_longitudinalitat_DIAGNOSTICS_GROUPED_timestamp.csv')
     df_CAT = pd.read_parquet('../data/FINAL_DB/full_CAT.parquet')
     df_CAT['timestamp'] = pd.to_datetime(df_CAT.index)
     json_path = '../data/FINAL_DB/targets_CAT.json'

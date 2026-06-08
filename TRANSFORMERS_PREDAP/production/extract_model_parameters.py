@@ -2,6 +2,7 @@ import mlflow
 import mlflow.pyfunc
 import pandas as pd
 import os
+from src.utils.experiments_utils import smart_read
 
 def load_mlflow_model_parameters(exp_names, model_names, output_filename="../models_parameters/model_parameters.csv"):
     new_runs_data = []
@@ -36,7 +37,7 @@ def load_mlflow_model_parameters(exp_names, model_names, output_filename="../mod
     if not new_runs_data:
         print("No new runs found to add.")
         if os.path.exists(output_filename):
-            return pd.read_csv(output_filename)
+            return smart_read(output_filename)
         return pd.DataFrame()
 
     # 3. Create DataFrame from all newly found runs
@@ -45,7 +46,7 @@ def load_mlflow_model_parameters(exp_names, model_names, output_filename="../mod
     # 4. Handle appending to the existing file out here
     if os.path.exists(output_filename):
         try:
-            existing_df = pd.read_csv(output_filename)
+            existing_df = smart_read(output_filename)
             updated_df = pd.concat([existing_df, df_new], ignore_index=True)
         except Exception as e:
             print(f"Error reading existing file, creating new one instead. Error: {e}")

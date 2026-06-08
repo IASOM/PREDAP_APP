@@ -66,7 +66,7 @@ def CCLR_pipeline(
         if data_path.endswith('.csv'):
             data_name = os.path.basename(data_path)
             data_path = '../data/FINAL_DB/' + data_name
-            df = pd.read_csv(data_path, index_col=0)
+            df = smart_read(data_path, index_col=0)
         else:
             data_name = os.path.basename(data_path)
             data_path = '../data/FINAL_DB/' + data_name 
@@ -306,7 +306,7 @@ if __name__ == "__main__":
         #Check if dataframe is in csv or parquet format
         if data_name.endswith('.csv'):
             data_path = '../data/FINAL_DB/' + data_name
-            df = pd.read_csv(data_path, index_col=0)
+            df = smart_read(data_path, index_col=0)
         else:
             data_path = '../data/FINAL_DB/' + data_name 
             df = pd.read_parquet(data_path)

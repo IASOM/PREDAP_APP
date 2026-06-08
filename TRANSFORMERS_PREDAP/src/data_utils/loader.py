@@ -9,4 +9,4 @@ def read(path, **kwargs):
         # Fallback to pandas
         if str(path).lower().endswith('.parquet'):
             return pd.read_parquet(path, **kwargs)
-        return pd.read_csv(path, **kwargs)
+        return smart_read(path, **kwargs)

@@ -171,7 +171,7 @@ def _load_selection_values(
             continue
 
         found_file = True
-        selection_df = pd.read_csv(path)
+        selection_df = smart_read(path)
         values = set(normalizer(selection_df.iloc[:, 0]).dropna())
         values.discard("")
         if not values:
@@ -231,7 +231,7 @@ def _load_selected_codes(
             continue
 
         found_file = True
-        selected_df = pd.read_csv(path)
+        selected_df = smart_read(path)
         if selected_df.empty:
             logger.warning(f"Selected diagnosis codes file is empty: {path}")
             continue

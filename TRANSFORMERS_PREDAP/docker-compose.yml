@@ -23,9 +23,9 @@ services:
       - redis
     volumes:
       # Conecta la carpeta física del servidor (izquierda) con la del contenedor (derecha)
-      - ${RELATIVE_MODELS_PATH}:/app/${MODELS_FOLDER_NAME}
-      - ${RELATIVE_SAVE_DATA_PATH}:/app/${SAVE_DATA_FOLDER_NAME}
-      - ${RELATIVE_READ_DATA_PATH}:/app/${READ_DATA_FOLDER_NAME}
+      - ${RELATIVE_MODELS_PATH:-./quantized_models}:/app/${MODELS_FOLDER_NAME}
+      - ${RELATIVE_SAVE_DATA_PATH:-./production_predictions}:/app/${SAVE_DATA_FOLDER_NAME}
+      - ${RELATIVE_READ_DATA_PATH:-./data}:/app/${READ_DATA_FOLDER_NAME}
     deploy:
       resources:
         reservations:

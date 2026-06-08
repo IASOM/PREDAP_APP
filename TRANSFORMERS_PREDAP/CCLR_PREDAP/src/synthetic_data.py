@@ -18,7 +18,7 @@ from sklearn.linear_model import LinearRegression
 
 # Load your dataset here (ensure the file exists in the same directory)
 # For example:
-# df = pd.read_csv("your_real_timeseries.csv", index_col=0, parse_dates=True)
+# df = smart_read("your_real_timeseries.csv", index_col=0, parse_dates=True)
 # Uncomment and modify the above line to point to your real data source
 
 # Example placeholder (delete this after adding your own data)

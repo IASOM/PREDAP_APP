@@ -41,7 +41,7 @@ def run_sample_demand_pipeline(
     _ensure_sample_files(input_dir, ["up_rs", "demand"])
 
     up_rs = _load_up_rs(input_dir)
-    visits = pd.read_csv(
+    visits = smart_read(
         input_dir / SAMPLE_INPUT_FILES["demand"],
         dtype={"UP": str},
     )
@@ -80,7 +80,7 @@ def run_sample_diagnosis_pipeline(
     _ensure_sample_files(input_dir, ["up_rs", "diagnosis", "selected_codes"])
 
     up_rs = _load_up_rs(input_dir)
-    diagnosis = pd.read_csv(
+    diagnosis = smart_read(
         input_dir / SAMPLE_INPUT_FILES["diagnosis"],
         dtype={"up_c": str, "problema_salut_c": str},
     )
@@ -157,7 +157,7 @@ def _ensure_sample_files(input_dir: Path, keys: Iterable[str]) -> None:
 
 
 def _load_up_rs(input_dir: Path) -> pd.DataFrame:
-    up_rs = pd.read_csv(input_dir / SAMPLE_INPUT_FILES["up_rs"], dtype={"Codi UP": str})
+    up_rs = smart_read(input_dir / SAMPLE_INPUT_FILES["up_rs"], dtype={"Codi UP": str})
     up_rs["Codi UP"] = up_rs["Codi UP"].astype(str).str.zfill(5)
     return up_rs
 
@@ -166,7 +166,7 @@ def _load_selected_codes(input_dir: Path) -> dict[str, list[str]]:
     path = input_dir / SAMPLE_INPUT_FILES["selected_codes"]
     if not path.exists():
         return {}
-    selected = pd.read_csv(path, dtype=str)
+    selected = smart_read(path, dtype=str)
     if selected.empty:
         return {}
 

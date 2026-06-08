@@ -196,3 +196,28 @@ python predap_cli.py sample-data --help
 ## Notes
 
 Aquest README fa de mapa general de la supercarpeta i dona la instal.lacio basica. Per entrenament complet, quantitzacio, reconstruccio i produccio, consulta el README de `TRANSFORMERS_PREDAP/`.
+ 
+## Docker: Reconstruct inside container
+
+If you want to run `reconstruct` inside the Docker container (recommended to match production deps):
+
+1. Build and start the container from `TRANSFORMERS_PREDAP`:
+
+```bash
+cd TRANSFORMERS_PREDAP
+docker compose build
+docker compose up -d
+```
+
+2. Exec into the running service and run `reconstruct` (adjust service name if different):
+
+```bash
+docker compose exec mi-api-ia bash
+python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF \
+	--data-path /app/TRANSFORMERS_PREDAP/AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/sample/multiyear_output/finals/demand_diagnosis_joined.parquet \
+	--prediction-start 2025-12-23 --prediction-end 2025-12-31
+```
+
+Notes:
+- Ensure the container has the `data/` and `quantized_models/` mounts configured in `docker-compose.yml` so `/app/...` paths exist.
+- Run the quick parquet sanity check shown earlier if the command fails to locate the file.

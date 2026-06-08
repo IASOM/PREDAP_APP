@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from utils_DL import create_model_gru, create_model_lstm, fit_model, prediction, inverse_transform, auto_grid_search
 
 # --- Load and preprocess dataset ---
-df = pd.read_csv('your_timeseries_data.csv', index_col=0, parse_dates=True)
+df = smart_read('your_timeseries_data.csv', index_col=0, parse_dates=True)
 target_col = 'target'  # Replace with actual target column name
 
 # Scale features

@@ -87,49 +87,101 @@ python scripts/predap.py --help
 
 ## Docker NVIDIA
 
-Des de la carpeta `TRANSFORMERS_PREDAP`, la ruta Docker recomanada per GPU es:
+Aquest projecte ofereix un `docker-compose.yml` per executar la API amb una imatge basada en NVIDIA TensorFlow.
+
+### 1. Preparar el directori del projecte
+
+A la carpeta `TRANSFORMERS_PREDAP` crea o comprova que existeixin aquestes carpetes locals:
 
 ```bash
-docker compose build
-docker compose up -d
-docker compose logs -f mi-api-ia
+mkdir -p quantized_models data production_predictions
 ```
 
-La API queda exposada nomes a localhost:
+Si fas servir Windows sense WSL2, crea les mateixes carpetes amb l'Explorador o PowerShell.
 
-```text
-http://127.0.0.1:8000
-```
+### 2. Configurar variables d'entorn
 
-El `dockerfile` parteix de `nvcr.io/nvidia/tensorflow:25.02-tf2-py3`, que ja inclou TensorFlow 2.17.0, Python 3.12.3, CUDA i cuDNN. Per aixo `requirements-docker.txt` no inclou ni `tensorflow` ni `keras`.
-
-Abans d'aixecar Docker revisa `.env`:
+Crea un fitxer `.env` a `TRANSFORMERS_PREDAP` amb els valors següents:
 
 ```env
 MODELS_FOLDER_NAME=quantized_models
 READ_DATA_FOLDER_NAME=data
 SAVE_DATA_FOLDER_NAME=production_predictions
 
-RELATIVE_MODELS_PATH=../quantized_models
-RELATIVE_READ_DATA_PATH=../data
-RELATIVE_SAVE_DATA_PATH=../production_predictions
+RELATIVE_MODELS_PATH=./quantized_models
+RELATIVE_READ_DATA_PATH=./data
+RELATIVE_SAVE_DATA_PATH=./production_predictions
 ```
 
-I comprova que existeixen les carpetes muntades:
+Els valors `RELATIVE_*` indiquen quines carpetes del teu ordinador es connecten dins del container.
+
+### 3. Construir i arrencar Docker
+
+Des de `TRANSFORMERS_PREDAP` executa:
 
 ```bash
-mkdir -p ../quantized_models ../data ../production_predictions
+docker compose build
+docker compose up -d
 ```
 
-En Windows, si no executes Docker des de WSL2, crea aquestes carpetes manualment o adapta els paths del `.env`.
+Després comprova l'estat del servei:
 
-Per verificar GPU dins el container:
+```bash
+docker compose ps
+docker compose logs -f mi-api-ia
+```
+
+### 4. Accedir a la API
+
+La API queda exposada a:
+
+```text
+http://127.0.0.1:8000
+```
+
+Per provar si està viva:
+
+```bash
+curl http://127.0.0.1:8000
+```
+
+### 5. Verificar TensorFlow i GPU
+
+Dins el container pots verificar la instal·lació amb:
 
 ```bash
 docker compose exec mi-api-ia python -c "import tensorflow as tf; print(tf.__version__); print(tf.config.list_physical_devices('GPU'))"
 ```
 
-Si la llista de GPU surt buida, revisa que el host tingui drivers NVIDIA, Docker Desktop/Engine amb suport GPU i NVIDIA Container Toolkit.
+Si no surt cap GPU, comprova:
+
+- Drivers NVIDIA instal·lats al host.
+- Docker Desktop/Engine amb suport GPU activat.
+- NVIDIA Container Toolkit instal·lat.
+- Que el container utilitzi GPU, no només CPU.
+
+### 6. Notes importants
+
+- El `dockerfile` utilitza `nvcr.io/nvidia/tensorflow:25.02-tf2-py3`, per tant no cal instal·lar TensorFlow dins el container.
+- `requirements-docker.txt` només instal·la dependències addicionals, no `tensorflow` ni `keras`.
+- Els volums es munten en aquestes rutes dins del container:
+  - `/app/quantized_models`
+  - `/app/data`
+  - `/app/production_predictions`
+
+### 7. Si tens errors d'UTF-8 en Docker
+
+A vegades el problema no és Docker, sinó que el codi intenta llegir un fitxer `.parquet` amb `pd.read_csv()`. Aquest README assumeix que el dataset d'entrada és un `.parquet` correcte i existeix a:
+
+```text
+TRANSFORMERS_PREDAP/AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/sample/multiyear_output/finals/demand_diagnosis_joined.parquet
+```
+
+Si executant la comanda `python predap_cli.py reconstruct ...` tens un error UTF-8, comprova:
+
+1. Que `--data-path` apunta a un `.parquet`, no a un `.csv` amb codificació errònia.
+2. Que el fitxer existeix realment en la ruta local abans de muntar-lo a Docker.
+3. Que dins el container la ruta coincideix amb `/app/data` si uses `READ_DATA_FOLDER_NAME=data`.
 
 ## 1. Obtenir dades amb AQUAS
 

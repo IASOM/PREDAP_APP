@@ -286,7 +286,7 @@ def test_final_store_writes_imputation_metadata_sidecars(tmp_path):
 
     summary_path, rows_path = get_imputation_metadata_paths(parquet_path)
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    rows = pd.read_csv(rows_path)
+    rows = smart_read(rows_path)
 
     assert summary_path.exists()
     assert rows_path.exists()
@@ -312,7 +312,7 @@ def test_write_parquet_imputation_metadata_command_helper(tmp_path):
 
     summary_path, rows_path = write_parquet_imputation_metadata(parquet_path)
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    rows = pd.read_csv(rows_path)
+    rows = smart_read(rows_path)
 
     assert summary["total_imputed_rows"] == 1
     assert rows["timestamp"].tolist() == ["2024-01-02"]

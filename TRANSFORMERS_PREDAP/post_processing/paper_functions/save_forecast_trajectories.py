@@ -347,7 +347,7 @@ def univariate_transformer_phase(input_directory, code, lookback, forecast, cuto
 
 def diagnostics_transformer_phase(code, lookback, forecast, final_cutoff_date, scaler, split_ratio: float = 0.8):
     train_split, test_split = split_train_test(
-            pd.read_csv(data_path), 
+            smart_read(data_path), 
             split_ratio=split_ratio, 
             cutoff_date = cutoff_date,
             max_date = final_cutoff_date,
@@ -405,7 +405,7 @@ def diagnostics_transformer_phase(code, lookback, forecast, final_cutoff_date, s
 
 
 def seasonal_transformer_phase(code, forecast, lookback,cutoff_date, final_cutoff_date, categorical_vars,predictions_train, predictions_test, scaler=None, split_ratio: float = 0.8):
-    df = pd.read_csv(data_path)
+    df = smart_read(data_path)
     # Prepare seasonal features for training data
     print("Preparing seasonal features for training data...")
     df_processed = data_preparation.prepare_time_series_features(

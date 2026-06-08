@@ -22,7 +22,7 @@ from model_architechture import model_architecture_residual_transformer
 from config.base_transformer_config import BaseTransformerConfig
 from production.data_preparation_in_poduction import DataPreparationInProduction
 
-np.read_csv = smart_read
+pd.read_csv = smart_read
 
 default_config = BaseTransformerConfig()
 

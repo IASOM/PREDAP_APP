@@ -35,6 +35,10 @@ def smart_read(file_path, **kwargs):
     return _original_read_csv(file_path, **kwargs)
 
 
+# Override pandas read_csv globally so any direct pd.read_csv calls in the inference bundle also handle parquet.
+pd.read_csv = smart_read
+
+
 def load_json_codes_list(json_path: str) -> str:
     with open(json_path, "r", encoding="utf-8") as file_handle:
         data = json.load(file_handle)

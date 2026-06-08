@@ -42,6 +42,30 @@ def smart_read(file_path, **kwargs):
         print(f"-> INFO: Leyendo {file_path} como CSV (o formato predeterminado).")
         return _original_read_csv(file_path, **kwargs)
 
+
+def safe_read(file_path, **kwargs):
+    """Attempt smart_read, but provide robust fallbacks for decoding/parquet issues.
+
+    Strategy:
+    - If smart_read succeeds, return result.
+    - On UnicodeDecodeError when reading as CSV, try reading as parquet.
+    - As a last resort, try original pd.read_csv with 'latin1' encoding.
+    """
+    try:
+        return smart_read(file_path, **kwargs)
+    except UnicodeDecodeError:
+        # Probably attempted to read a binary file as text; try parquet
+        try:
+            return pd.read_parquet(file_path, **kwargs)
+        except Exception:
+            return _original_read_csv(file_path, encoding="latin1", **kwargs)
+    except Exception:
+        # If smart_read failed for another reason, bubble up the exception
+        raise
+
+# Override pandas read_csv globally after defining smart_read so direct pd.read_csv calls work for parquet paths too.
+pd.read_csv = smart_read
+
 # Utility function for safe float conversion
 def safe_float(value):
     """Convert value to float, handling numpy types and NaN values"""
@@ -84,7 +108,7 @@ def get_codes_list(input_directory: str) -> str:
     individually wrapped in quotes as a comma-separated string for Hydra sweeps.
     """
     if input_directory.endswith('.csv'):
-        df = pd.read_csv(input_directory, nrows=0)
+        df = smart_read(input_directory, nrows=0)
         codes_list = df.columns.tolist()
     elif input_directory.endswith('.parquet'):
         import pyarrow.parquet as pq

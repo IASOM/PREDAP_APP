@@ -390,6 +390,10 @@ class DiagnosticResidualTransformerPipeline:
         """Train the residual correction model"""
         if self.residual_model is None:
             self.build_residual_model()
+        
+        # Create structured directory: model_folder/{code}/diagnostics_model/
+        model_save_folder = os.path.join(self.config.model_folder, self.config.code, "diagnostics_model")
+        os.makedirs(model_save_folder, exist_ok=True)
             
         print("Training residual correction model...")
         
@@ -406,9 +410,9 @@ class DiagnosticResidualTransformerPipeline:
             save_memory=False,
             callbacks=callbacks,
             save_history=True,
-            model_folder=self.config.model_folder,
+            model_folder=model_save_folder,
         )
-        metadata_path = self.config.save_metadata(self.residual_model_name, model_folder=self.config.model_folder)
+        metadata_path = self.config.save_metadata(self.residual_model_name, model_folder=model_save_folder)
         print(f"Residual model metadata saved to: {metadata_path}")
         
         # Generate corrected training predictions

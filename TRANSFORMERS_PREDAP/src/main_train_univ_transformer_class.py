@@ -297,6 +297,10 @@ class UnivariateTransformerPipeline:
         # Generate model name
         self.model_name = self.config.get_model_name()
         
+        # Create structured directory: model_folder/{code}/univariate_model/
+        model_save_folder = os.path.join(self.config.model_folder, self.config.code, "univariate_model")
+        os.makedirs(model_save_folder, exist_ok=True)
+        
         # Setup callbacks
         callbacks = self.setup_callbacks()
         
@@ -312,11 +316,11 @@ class UnivariateTransformerPipeline:
             save_history=self.config.save_train_history,
             shuffle=self.config.shuffle_data,
             patience = self.config.early_stop_patience,
-            model_folder=self.config.model_folder,
+            model_folder=model_save_folder,
         )
         
         self.training_history = training_results
-        metadata_path = self.config.save_metadata(self.model_name, model_folder=self.config.model_folder)
+        metadata_path = self.config.save_metadata(self.model_name, model_folder=model_save_folder)
         print(f"Model metadata saved to: {metadata_path}")
 
         self.train_predictions = self.model.predict(X, verbose=1)
@@ -338,9 +342,12 @@ class UnivariateTransformerPipeline:
         print("EVALUATION PHASE")
         print("="*50)
         
-        print("Files in model folder:", os.listdir(self.config.model_folder))
+        # Model folder with structured path: model_folder/{code}/univariate_model/
+        model_folder_path = os.path.join(self.config.model_folder, self.config.code, "univariate_model")
         
-        trained_models = [f for f in os.listdir(self.config.model_folder) if f.endswith('.keras')]
+        print("Files in model folder:", os.listdir(model_folder_path) if os.path.exists(model_folder_path) else "Folder not found")
+        
+        trained_models = [f for f in os.listdir(model_folder_path) if f.endswith('.keras')] if os.path.exists(model_folder_path) else []
         print("Trained models:", trained_models)
         
         # Create pandemic waves DataFrame
@@ -354,7 +361,7 @@ class UnivariateTransformerPipeline:
             cutoff_date=self.config.cutoff_date,
             max_date = self.config.final_cutoff_date,
             covid_token=self.config.covid_token,
-            MODEL_FOLDER=self.config.model_folder,
+            MODEL_FOLDER=model_folder_path,
             df_waves=df_waves,
             scaler = self.config.scaler,
             eliminate_covid_data = self.config.eliminate_covid_data,

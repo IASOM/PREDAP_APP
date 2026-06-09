@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -53,6 +54,59 @@ def _csv_strings(value: str) -> list[str]:
     if not items:
         raise argparse.ArgumentTypeError("Expected at least one value")
     return items
+
+
+def _canonical_code_name(name: str) -> str:
+    canonical = str(name).strip().replace("#", ":")
+    if canonical.startswith("DEMAND_"):
+        canonical = canonical[len("DEMAND_"):]
+    canonical = canonical.replace("__", "_").upper()
+    aliases = {
+        "VISI_SITUACIO_VISITA_N": "VISI_SITUACIO_VISITA_NO_PROGRAMADA",
+        "VISI_SITUACIO_VISITA_P": "VISI_SITUACIO_VISITA_PROGRAMADA",
+        "VISI_SITUACIO_VISITA_R": "VISI_SITUACIO_VISITA_URGENT",
+        "SERVEI_CODI_MF": "SERVEI_CODI_MEDFAM",
+    }
+    for legacy, current in aliases.items():
+        canonical = re.sub(
+            rf"(^|_){re.escape(legacy)}($|_)",
+            lambda match: f"{match.group(1)}{current}{match.group(2)}",
+            canonical,
+        )
+    return re.sub(r"[^A-Z0-9]+", "_", canonical).strip("_")
+
+
+def _dataset_columns(data_path: Path) -> list[str]:
+    if str(data_path).lower().endswith(".parquet"):
+        import pyarrow.parquet as pq
+
+        return pq.read_schema(data_path).names
+    import pandas as pd
+
+    return pd.read_csv(data_path, nrows=0).columns.tolist()
+
+
+def _filter_codes_in_dataset(codes: list[str], data_path: Path) -> list[str]:
+    columns = _dataset_columns(data_path)
+    lookup = {_canonical_code_name(column): column for column in columns if column != "timestamp"}
+    resolved_codes = []
+    skipped_codes = []
+    for code in codes:
+        resolved = lookup.get(_canonical_code_name(code))
+        if resolved is None:
+            skipped_codes.append(code)
+        else:
+            if resolved != code:
+                print(f"-> INFO: Mapped requested code '{code}' to dataset column '{resolved}'.")
+            resolved_codes.append(resolved)
+    if skipped_codes:
+        print(
+            "-> WARNING: Skipping codes not found in input dataset: "
+            + ", ".join(skipped_codes)
+        )
+    if not resolved_codes:
+        raise ValueError("None of the requested codes were found in the input dataset.")
+    return resolved_codes
 
 
 def _subprocess(command: Iterable[str], cwd: Path) -> int:
@@ -195,8 +249,6 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
 
     from production.model_reconstruction_pipeline import ModelPredictionPipeline
     from src.config.base_transformer_config import BaseTransformerConfig
-    from src.utils.experiments_utils import get_codes_list
-
     lookbacks = args.lookbacks or [7, 14, 60, 60, 182, 182]
     forecasts = args.forecasts or [7, 14, 30, 60, 182, 365]
     if len(lookbacks) != len(forecasts):
@@ -205,9 +257,14 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
     if args.codes:
         codes = args.codes
     elif args.all_codes:
-        codes = get_codes_list(str(args.data_path))
+        codes = [
+            column
+            for column in _dataset_columns(args.data_path)
+            if column != "timestamp" and not str(column).startswith("__index")
+        ]
     else:
         codes = [args.code]
+    codes = _filter_codes_in_dataset(codes, args.data_path)
 
     if args.prediction_dates:
         prediction_dates = args.prediction_dates
@@ -224,24 +281,30 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
     final_output_df = pd.DataFrame()
     pipeline = None
     for code in codes:
+        config_kwargs = {
+            "code": code,
+            "data_path": str(args.data_path),
+            "model_folder": str(args.model_folder),
+            "cutoff_date": args.cutoff_date,
+            "covid_token": args.covid_token,
+            "positional_encoding": args.positional_encoding,
+            "evaluate_model": args.evaluate_model,
+            "head_size": args.head_size,
+            "num_heads": args.num_heads,
+            "ff_dim": args.ff_dim,
+            "num_transformer_blocks": args.num_transformer_blocks,
+            "mlp_units": args.mlp_units,
+            "activation_function": args.activation_function,
+            "dropout": args.dropout,
+            "learning_rate": args.learning_rate,
+            "epochs": args.epochs,
+            "batch_size": args.batch_size,
+        }
+        if args.diagnostic_covariates_prefix:
+            config_kwargs["diagnostic_covariates_path"] = args.diagnostic_covariates_prefix
+
         config = BaseTransformerConfig(
-            code=code,
-            data_path=str(args.data_path),
-            model_folder=str(args.model_folder),
-            cutoff_date=args.cutoff_date,
-            covid_token=args.covid_token,
-            positional_encoding=args.positional_encoding,
-            evaluate_model=args.evaluate_model,
-            head_size=args.head_size,
-            num_heads=args.num_heads,
-            ff_dim=args.ff_dim,
-            num_transformer_blocks=args.num_transformer_blocks,
-            mlp_units=args.mlp_units,
-            activation_function=args.activation_function,
-            dropout=args.dropout,
-            learning_rate=args.learning_rate,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
+            **config_kwargs,
         )
         config.scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
         pipeline = ModelPredictionPipeline(config=config)
@@ -448,6 +511,7 @@ Examples:
     reconstruct.add_argument("--prediction-end", help="End date for a daily prediction range, formatted YYYY-MM-DD.")
     reconstruct.add_argument("--output-dir", type=Path, default=REPO_ROOT.parent / "production_predictions" / "final_output_predictions", help="Directory where prediction outputs are written.")
     reconstruct.add_argument("--metrics-path", type=Path, default=REPO_ROOT.parent / "production_predictions" / "production_evaluation_metrics.parquet", help="Metrics parquet used when deleting old production rows.")
+    reconstruct.add_argument("--diagnostic-covariates-prefix", help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
     reconstruct.add_argument("--delete-old", action=argparse.BooleanOptionalAction, default=True, help="Delete/update old prediction, real-data, and metrics rows after reconstruction.")
     reconstruct.set_defaults(func=cmd_reconstruct)
 

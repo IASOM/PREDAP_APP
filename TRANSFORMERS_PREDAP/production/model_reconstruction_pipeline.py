@@ -87,6 +87,62 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         )
         return model
     
+    def _resolve_model_weights_path(
+        self,
+        models_directory: str,
+        code: str,
+        model_type: str,
+        forecast: int,
+        lookback: int,
+    ) -> str:
+        if not os.path.isdir(models_directory):
+            raise FileNotFoundError(f"Models directory not found: {models_directory}")
+
+        exact_code_dir = os.path.join(models_directory, code)
+        if os.path.isdir(exact_code_dir):
+            code_dir = exact_code_dir
+            model_code = code
+        else:
+            lookup = {
+                self._canonical_column_name(name): name
+                for name in os.listdir(models_directory)
+                if os.path.isdir(os.path.join(models_directory, name))
+            }
+            model_code = lookup.get(self._canonical_column_name(code))
+            if model_code is None:
+                available = ", ".join(sorted(lookup.values())[:20])
+                raise FileNotFoundError(
+                    f"Could not map code '{code}' to a model folder in {models_directory}. "
+                    f"Available folders sample: {available}"
+                )
+            code_dir = os.path.join(models_directory, model_code)
+            print(f"-> INFO: Mapped model code '{code}' to model folder '{model_code}'.")
+
+        weights_path = os.path.join(
+            code_dir,
+            model_type,
+            f"{model_code}_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5",
+        )
+        if os.path.exists(weights_path):
+            return weights_path
+
+        model_type_dir = os.path.join(code_dir, model_type)
+        if os.path.isdir(model_type_dir):
+            suffix = f"_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5"
+            matches = [
+                os.path.join(model_type_dir, name)
+                for name in os.listdir(model_type_dir)
+                if name.endswith(suffix)
+            ]
+            if len(matches) == 1:
+                print(f"-> INFO: Resolved weights file by suffix: {matches[0]}")
+                return matches[0]
+
+        raise FileNotFoundError(
+            f"Weights file not found for code='{code}', model_type='{model_type}', "
+            f"forecast={forecast}, lookback={lookback}. Tried: {weights_path}"
+        )
+
     def load_model_weights(self,model, code, lookback, forecast, models_directory, model_type="univariate"):
         """
         Loads the weights of a Keras model from a specified path.
@@ -97,8 +153,13 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         Returns:
             The Keras model instance with loaded weights.
         """
-
-        weights_path =  f"{models_directory}/{code}/{model_type}/{code}_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5"
+        weights_path = self._resolve_model_weights_path(
+            models_directory=models_directory,
+            code=code,
+            model_type=model_type,
+            forecast=forecast,
+            lookback=lookback,
+        )
         
         print(model.summary())
         # Try to identify mismatch before loading
@@ -159,42 +220,6 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             transformer_params=DEFAULT_RESIDUAL_TRANSFORMER_PARAMS,
             activation_function=activation_function
         )
-
-
-        #Temporary solution for the name mismatch between the codes in the input data and the codes expected by the reconstruction pipeline and the saved models. Remove the first "DEMAND_" characters if they are present, and replace any "_" with "__" to match the format of the saved models. 
-        def process_col_name(col):
-            # 1. Keep 'timestamp' as is
-            if col == 'timestamp':
-                return col
-            
-            # 2. Remove 'DEMAND_' prefix if present
-            code = col[7:] if col.startswith("DEMAND_") else col
-            
-            # 3. Identify all positions of '_'
-            indices = [i for i, char in enumerate(code) if char == '_']
-            
-            # If no underscores, return code as is
-            if not indices:
-                return code
-            
-            # If there is only one underscore, replace it with '__'
-            if len(indices) == 1:
-                idx = indices[0]
-                return code[:idx] + "__" + code[idx+1:]
-            
-            # If there are multiple, replace the first and last with '__'
-            first_idx = indices[0]
-            last_idx = indices[-1]
-            
-            # Reconstruct the string: 
-            # Prefix + "__" + Middle + "__" + Suffix
-            return code[:first_idx] + "__" + code[first_idx+1:last_idx] + "__" + code[last_idx+1:]
-
-        #Temporary solution for the name mismatch 
-        code = code[7:] if code.startswith("DEMAND_") else code
-        #add a __ if you find a _ in the code, to match the format of the saved models, which have _ instead of : in the code names
-        code = process_col_name(code)
-
 
         univ_model = self.load_model_weights(univ_model, code, lookback, forecast, models_directory, model_type="univariate_model")
         diagnostics_model = self.load_model_weights(diagnostics_model, code, lookback, forecast, models_directory, model_type="diagnostics_model")

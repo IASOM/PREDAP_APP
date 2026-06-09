@@ -53,6 +53,7 @@ class BaseTransformerConfig(ABC):
     
     cutoff_date: str = "2008-01-01"
     max_date: str = "2027-09-30"#"2021-06-30"#
+    final_cutoff_date: Optional[str] = None
     positional_encoding: bool = True
     default_split_ratio: float = 0.8
     eliminate_covid_data: bool = False
@@ -140,6 +141,10 @@ class BaseTransformerConfig(ABC):
     
     def __post_init__(self):
         """Validate parameters after initialization"""
+        if self.final_cutoff_date is None:
+            self.final_cutoff_date = self.max_date
+        else:
+            self.max_date = self.final_cutoff_date
         self._validate_core_parameters()
         self._validate_architecture_parameters()
         self._validate_training_parameters()
@@ -193,6 +198,8 @@ class BaseTransformerConfig(ABC):
             "epochs": self.epochs,
             "batch_size": self.batch_size,
             "cutoff_date": self.cutoff_date,
+            "max_date": self.max_date,
+            "final_cutoff_date": self.final_cutoff_date,
             "covid_token": self.covid_token,
             "positional_encoding": self.positional_encoding,
             "activation_function": self.activation_function,

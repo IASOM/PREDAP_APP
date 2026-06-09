@@ -1,6 +1,8 @@
 
 import numpy as np
 import pandas as pd
+import os
+import re
 from sklearn.preprocessing import FunctionTransformer
 from typing import List, Optional, Tuple
 from utils.experiments_utils import smart_read
@@ -15,6 +17,142 @@ class DataPreparationInProduction:
     def __init__(self, config: BaseTransformerConfig = default_config):
         self.config = config
         self.config.print_config()
+
+    _COLUMN_ALIASES = {
+        "VISI_SITUACIO_VISITA_N": "VISI_SITUACIO_VISITA_NO_PROGRAMADA",
+        "VISI_SITUACIO_VISITA_P": "VISI_SITUACIO_VISITA_PROGRAMADA",
+        "VISI_SITUACIO_VISITA_R": "VISI_SITUACIO_VISITA_URGENT",
+        "SERVEI_CODI_MF": "SERVEI_CODI_MEDFAM",
+    }
+
+    def _canonical_column_name(self, name: str) -> str:
+        canonical = str(name).strip().replace("#", ":")
+        if canonical.startswith("DEMAND_"):
+            canonical = canonical[len("DEMAND_"):]
+        canonical = canonical.replace("__", "_")
+        canonical = canonical.upper()
+        for legacy, current in self._COLUMN_ALIASES.items():
+            canonical = re.sub(
+                rf"(^|_){re.escape(legacy)}($|_)",
+                lambda match: f"{match.group(1)}{current}{match.group(2)}",
+                canonical,
+            )
+        canonical = re.sub(r"[^A-Z0-9]+", "_", canonical).strip("_")
+        return canonical
+
+    def _column_lookup(self, columns) -> dict:
+        lookup = {}
+        for column in columns:
+            lookup.setdefault(self._canonical_column_name(column), column)
+        return lookup
+
+    def _resolve_column(self, columns, requested: str, role: str) -> str:
+        if requested in columns:
+            return requested
+        requested = str(requested).strip()
+        lookup = self._column_lookup(columns)
+        resolved = lookup.get(self._canonical_column_name(requested))
+        if resolved is not None:
+            if resolved != requested:
+                print(f"-> INFO: Mapped {role} '{requested}' to dataset column '{resolved}'.")
+            return resolved
+        sample = ", ".join(map(str, list(columns)[:12]))
+        raise ValueError(
+            f"Could not map {role} '{requested}' to a column in the input dataset. "
+            f"Available columns sample: {sample}"
+        )
+
+    def _resolve_columns(self, columns, requested_columns: List[str], role: str) -> List[str]:
+        resolved_columns = []
+        missing = []
+        lookup = self._column_lookup(columns)
+        for requested in requested_columns:
+            requested = str(requested).strip()
+            if not requested:
+                continue
+            if requested in columns:
+                resolved_columns.append(requested)
+                continue
+            resolved = lookup.get(self._canonical_column_name(requested))
+            if resolved is None:
+                missing.append(requested)
+            else:
+                resolved_columns.append(resolved)
+        if missing:
+            examples = ", ".join(missing[:10])
+            print(
+                f"-> WARNING: Skipping {len(missing)} {role} not found in the input dataset. "
+                f"First skipped values: {examples}."
+            )
+        changed = sum(
+            1
+            for original, resolved in zip(
+                [str(col).strip() for col in requested_columns if str(col).strip()],
+                resolved_columns,
+            )
+            if original != resolved
+        )
+        if changed:
+            print(f"-> INFO: Mapped {changed} {role} to current dataset column names.")
+        return resolved_columns
+
+    def _resolve_feature_values(
+        self,
+        df_features: pd.DataFrame,
+        requested_columns: List[str],
+        role: str,
+    ) -> np.ndarray:
+        values = []
+        missing = []
+        changed = 0
+        lookup = self._column_lookup(df_features.columns)
+        for requested in requested_columns:
+            requested = str(requested).strip()
+            if not requested:
+                continue
+            if requested in df_features.columns:
+                values.append(df_features[requested].values)
+                continue
+            resolved = lookup.get(self._canonical_column_name(requested))
+            if resolved is None:
+                missing.append(requested)
+                values.append(np.zeros(len(df_features), dtype=np.float32))
+            else:
+                values.append(df_features[resolved].values)
+                if resolved != requested:
+                    changed += 1
+        if missing:
+            examples = ", ".join(missing[:10])
+            print(
+                f"-> WARNING: {len(missing)} {role} were not found in the input dataset. "
+                f"Using zero-filled placeholders so reconstruction can continue. "
+                f"First missing values: {examples}."
+            )
+        if changed:
+            print(f"-> INFO: Mapped {changed} {role} to current dataset column names.")
+        if not values:
+            return np.empty((len(df_features), 0), dtype=np.float32)
+        return np.column_stack(values)
+
+    def _diagnostic_covariate_file_candidates(self, diagnostic_covariates_path: str, code: str) -> List[str]:
+        code_text = str(code).strip().replace("#", ":")
+        variants = [
+            code_text,
+            code_text.replace("__", "_"),
+            code_text.replace("_", "__", 1) if "_" in code_text else code_text,
+        ]
+        if code_text.startswith("DEMAND_"):
+            variants.append(code_text[len("DEMAND_"):])
+        else:
+            variants.append(f"DEMAND_{code_text}")
+
+        ordered = []
+        for variant in variants:
+            for normalized in (variant, variant.replace("__", "_")):
+                path = diagnostic_covariates_path + normalized + ".xlsx"
+                if path not in ordered:
+                    ordered.append(path)
+        return ordered
 
     def load_diagnostic_covariates(self,diagnostic_covariates_path,code, forecast):
             """ 
@@ -31,9 +169,26 @@ class DataPreparationInProduction:
             Returns:
                 A list of diagnostic covariate names to be used for the specified code and forecast horizon.
             """
+            candidates = self._diagnostic_covariate_file_candidates(diagnostic_covariates_path, code)
+            selected_path = next((path for path in candidates if os.path.exists(path)), None)
+            if selected_path is None:
+                raise FileNotFoundError(
+                    f"Diagnostic covariates file not found for code '{code}'. "
+                    f"Tried: {', '.join(candidates)}"
+                )
 
-            diagnostic_covariates_df = pd.read_excel(diagnostic_covariates_path + code + ".xlsx", engine='openpyxl')
-            diagnostic_covariates_list = list(diagnostic_covariates_df[diagnostic_covariates_df['LAG'] ==  forecast]['predictors'])[0].split(',')
+            diagnostic_covariates_df = pd.read_excel(selected_path, engine='openpyxl')
+            matching_rows = diagnostic_covariates_df[diagnostic_covariates_df['LAG'] ==  forecast]
+            if matching_rows.empty:
+                raise ValueError(
+                    f"No diagnostic covariates row found in {selected_path} for LAG={forecast}."
+                )
+            predictors_value = matching_rows['predictors'].iloc[0]
+            diagnostic_covariates_list = [
+                item.strip()
+                for item in str(predictors_value).split(',')
+                if item.strip()
+            ]
         
             return diagnostic_covariates_list
 
@@ -60,7 +215,6 @@ class DataPreparationInProduction:
             Y_raw: A numpy array containing the target values for the model.
             df_timestamp: A pandas Series containing the timestamps corresponding to the input features and target valuesç
         """
-        code = code.replace("#", ":")
         # Load CSV or Parquet
         df = smart_read(data_path)
         if eliminate_covid_data:
@@ -75,13 +229,8 @@ class DataPreparationInProduction:
         df_dates = df_dates.drop(columns=['timestamp']) 
          
         # univariate scenario ...................................................
-        # Temporary solution for the name mismatch between the codes in the input data and the codes expected by the reconstruction pipeline and the saved models. Remove the first "DEMAND_" characters if they are present, and replace any "_" with "__" to match the format of the saved models.
-        #add DEMAND_ in front of the code if it's not already there, to match the format of the input data
-        code = "DEMAND_" + code if not code.startswith("DEMAND_") else code
-        code = code.replace("__", "_") if "__" in code else code
-        idx_code = df.columns.get_loc(code)
-        feature_cols = df.columns[idx_code]  
-        target_col = df.columns[idx_code]  # Get the target column 
+        target_col = self._resolve_column(df.columns, code, "target code")
+        feature_cols = target_col
         
         # Convert to numpy arrays
         X_raw = df[feature_cols].values.reshape(-1, 1)  
@@ -136,8 +285,7 @@ class DataPreparationInProduction:
             X_raw: A numpy array containing the input features for diagnostics.
             Y_raw: A numpy array containing the target values for diagnostics.
         """
-        relevant_feature_cols = self.load_diagnostic_covariates(default_config.diagnostic_covariates_path, code, forecast)
-        code = code.replace("#", ":")
+        relevant_feature_cols = self.load_diagnostic_covariates(self.config.diagnostic_covariates_path, code, forecast)
         # Load CSV or Parquet
         df = smart_read(data_path)
         if eliminate_covid_data:
@@ -158,26 +306,15 @@ class DataPreparationInProduction:
         
         # multivariate scenario ..................................................
         # Select feature columns (exclude timestamp & target)
-        # Temporary solution for the name mismatch between the codes in the input data and the codes expected by the reconstruction pipeline and the saved models. Remove the first "DEMAND_" characters if they are present, and replace any "_" with "__" to match the format of the saved models.
-        #add DEMAND_ in front of the code if it's not already there, to match the format of the input data
-        old_code = code
-        code = "DEMAND_" + code if not code.startswith("DEMAND_") else code
-        code = code.replace("__", "_") if "__" in code else code
-
-        df.columns = [
-            col if col == 'timestamp' else ("DEMAND_" + col if not col.startswith("DEMAND_") else col).replace("__", "_")
-            for col in df.columns
-        ]
-        if code not in df.columns:#Temporary solution for the name mismatch between the codes in the input data and the codes expected by the reconstruction pipeline and the saved models. If the code with "DEMAND_" prefix is not found, try without the prefix.
-            code = old_code
-
-        
-        idx_code = df.columns.get_loc(code)
+        target_col = self._resolve_column(df.columns, code, "target code")
         df_features = df.drop(columns = ['timestamp'])
-        target_col = df.columns[idx_code]  # Target code column
         # Convert DataFrame to numpy arrays
         if relevant_feature_cols is not None:
-            X_raw = df_features[relevant_feature_cols].values  
+            X_raw = self._resolve_feature_values(
+                df_features,
+                relevant_feature_cols,
+                "diagnostic predictor columns",
+            )
             X_raw = np.hstack((X_raw, df_dates.values.astype(np.float32)))
         else:
             X_raw = df_features.values
@@ -224,7 +361,7 @@ class DataPreparationInProduction:
             df, 
             self.config.DEFAULT_SEASONAL_CATEGORICAL_VARS, 
             cutoff_date=self.config.cutoff_date,
-            max_date = self.config.final_cutoff_date,
+            max_date = max_date,
             scaler = self.config.scaler,
             eliminate_covid_data=self.config.eliminate_covid_data, 
             covid_dates=self.config.covid_dates,)
@@ -234,6 +371,3 @@ class DataPreparationInProduction:
 
 
         return X_seasonal_covs
-
-
-

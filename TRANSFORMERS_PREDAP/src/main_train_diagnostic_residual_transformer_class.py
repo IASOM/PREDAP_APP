@@ -408,7 +408,7 @@ class DiagnosticResidualTransformerPipeline:
             save_history=True,
             model_folder=self.config.model_folder,
         )
-        metadata_path = self.config.save_metadata(self.residual_model_name)
+        metadata_path = self.config.save_metadata(self.residual_model_name, model_folder=self.config.model_folder)
         print(f"Residual model metadata saved to: {metadata_path}")
         
         # Generate corrected training predictions

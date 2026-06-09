@@ -316,7 +316,7 @@ class UnivariateTransformerPipeline:
         )
         
         self.training_history = training_results
-        metadata_path = self.config.save_metadata(self.model_name)
+        metadata_path = self.config.save_metadata(self.model_name, model_folder=self.config.model_folder)
         print(f"Model metadata saved to: {metadata_path}")
 
         self.train_predictions = self.model.predict(X, verbose=1)

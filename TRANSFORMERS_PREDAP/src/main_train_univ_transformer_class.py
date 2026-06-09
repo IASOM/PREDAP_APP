@@ -312,9 +312,12 @@ class UnivariateTransformerPipeline:
             save_history=self.config.save_train_history,
             shuffle=self.config.shuffle_data,
             patience = self.config.early_stop_patience,
+            model_folder=self.config.model_folder,
         )
         
         self.training_history = training_results
+        metadata_path = self.config.save_metadata(self.model_name)
+        print(f"Model metadata saved to: {metadata_path}")
 
         self.train_predictions = self.model.predict(X, verbose=1)
         

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Tuple, Any
 from abc import ABC, abstractmethod
 import os
+import json
 from datetime import datetime
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, PowerTransformer, QuantileTransformer, FunctionTransformer
 
@@ -190,11 +191,11 @@ class BaseTransformerConfig(ABC):
             "num_transformer_blocks": self.num_transformer_blocks,
             "mlp_units": self.mlp_units,
             "dropout": self.dropout,
+            "activation_function": self.activation_function,
             "learning_rate": self.learning_rate,
             "lr_max_multiplier": self.lr_max_multiplier,
             "lr_min_multiplier": self.lr_min_multiplier,
             "lr_warmup_ratio": self.lr_warmup_ratio,
-
             "epochs": self.epochs,
             "batch_size": self.batch_size,
             "cutoff_date": self.cutoff_date,
@@ -202,10 +203,38 @@ class BaseTransformerConfig(ABC):
             "final_cutoff_date": self.final_cutoff_date,
             "covid_token": self.covid_token,
             "positional_encoding": self.positional_encoding,
-            "activation_function": self.activation_function,
             "evaluate_model": self.evaluate_model,
             "data_path": self.data_path,
+            "model_folder": self.model_folder,
+            "plots_dir": self.plots_dir,
+            "production_predictions_dir": self.production_predictions_dir,
+            "production_predictions_file": self.production_predictions_file,
+            "production_metrics_file": self.production_metrics_file,
+            "default_split_ratio": self.default_split_ratio,
+            "eliminate_covid_data": self.eliminate_covid_data,
+            "covid_dates": self.covid_dates,
+            "save_train_history": self.save_train_history,
         }
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Return a metadata dictionary for the current configuration."""
+        metadata = self.to_dict()
+        metadata["scaler"] = type(self.scaler).__name__
+        metadata["scaler_repr"] = repr(self.scaler)
+        return metadata
+
+    def save_metadata(self, model_name: str, model_folder: Optional[str] = None) -> str:
+        """Save the model configuration metadata to a JSON file next to the saved model."""
+        save_folder = model_folder or self.model_folder
+        os.makedirs(save_folder, exist_ok=True)
+        metadata = self.get_metadata()
+        metadata["model_name"] = model_name
+        metadata["saved_at"] = datetime.utcnow().isoformat() + "Z"
+        metadata["model_folder"] = str(save_folder)
+        metadata_file = os.path.join(save_folder, f"{os.path.splitext(model_name)[0]}_metadata.json")
+        with open(metadata_file, "w", encoding="utf-8") as meta_fp:
+            json.dump(metadata, meta_fp, indent=2, ensure_ascii=False)
+        return metadata_file
     
     def print_config(self):
         """Print configuration in a readable format"""

@@ -18,7 +18,7 @@ default_config = get_config()
 
 def train_given_model_and_data(model, X, Y, batch_size=1024, model_name=None, epochs=100, 
                                save_history=False, save_model=True, save_memory=True, 
-                               shuffle=False, callbacks=None, patience = 10):
+                               shuffle=False, callbacks=None, patience = 10, model_folder=None):
     """
     Train a given model with provided data and save results.
     
@@ -49,20 +49,22 @@ def train_given_model_and_data(model, X, Y, batch_size=1024, model_name=None, ep
         early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=patience, restore_best_weights=True)
         callbacks = [early_stop]
 
-    if not os.path.exists(f'{model_name}'):  # check if model exist and run if not
-        history = model.fit(x=X, 
-                            y=Y, 
-                            batch_size=batch_size,  # batch gradient descent (batch size 1024)
-                            epochs=epochs, 
-                            shuffle=shuffle,        # Allows shuffling
-                            validation_split=0.3,   # 30% data for validation
-                            callbacks=callbacks)
-    else:
-        print(f"model {model_name} already exists")
-        return
-
     if model_name is None:
         model_name = "testing"
+
+    save_folder = model_folder or default_config.model_folder
+    save_path = os.path.join(save_folder, model_name)
+    if os.path.exists(save_path):  # check if model exists and run if not
+        print(f"model {model_name} already exists at {save_path}")
+        return
+
+    history = model.fit(x=X, 
+                        y=Y, 
+                        batch_size=batch_size,  # batch gradient descent (batch size 1024)
+                        epochs=epochs, 
+                        shuffle=shuffle,        # Allows shuffling
+                        validation_split=0.3,   # 30% data for validation
+                        callbacks=callbacks)
 
     if save_history:  # save training history
         raw_model_name = model_name.replace('.keras', '')
@@ -79,8 +81,11 @@ def train_given_model_and_data(model, X, Y, batch_size=1024, model_name=None, ep
         del clean_history
     
     if save_model and epochs > 1:  # save model
-        os.makedirs(default_config.model_folder, exist_ok=True)
-        model.save(default_config.model_folder +"/" + model_name)
+        save_folder = model_folder or default_config.model_folder
+        os.makedirs(save_folder, exist_ok=True)
+        save_path = os.path.join(save_folder, model_name)
+        model.save(save_path)
+        print(f"Model saved to: {save_path}")
 
     if save_memory:  # log memory usage (optional)
         # save memory usage

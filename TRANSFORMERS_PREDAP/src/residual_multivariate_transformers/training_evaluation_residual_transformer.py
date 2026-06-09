@@ -56,7 +56,8 @@ def train_given_model_and_data(model, X, Y,
                                save_history=None, 
                                save_model=None, 
                                save_memory=None, 
-                               callbacks=None):
+                               callbacks=None,
+                               model_folder=None):
     """
     Train a model with given data and parameters.
     
@@ -129,9 +130,10 @@ def train_given_model_and_data(model, X, Y,
         )
         callbacks = [early_stop]
 
-    # Check if model already exists
-    if os.path.exists(f'{model_name}'):
-        print(f"Model {model_name} already exists")
+    save_folder = model_folder or default_config.model_folder
+    save_path = os.path.join(save_folder, model_name)
+    if os.path.exists(save_path):
+        print(f"Model {model_name} already exists at {save_path}")
         return None
 
     # Train the model
@@ -163,9 +165,11 @@ def train_given_model_and_data(model, X, Y,
     
     # Save model
     if save_model and epochs > 1:
-        os.makedirs(default_config.model_folder, exist_ok=True)
-        model.save(os.path.join(default_config.model_folder, model_name))
-        print(f"Model saved to: {model_name}")
+        save_folder = model_folder or default_config.model_folder
+        os.makedirs(save_folder, exist_ok=True)
+        save_path = os.path.join(save_folder, model_name)
+        model.save(save_path)
+        print(f"Model saved to: {save_path}")
         
     # Log memory usage if enabled
     if save_memory:

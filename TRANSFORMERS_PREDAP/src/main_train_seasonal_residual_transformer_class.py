@@ -368,7 +368,10 @@ class SeasonalResidualTransformerPipeline:
             save_memory=False,
             callbacks=callbacks,
             save_history=True,
+            model_folder=self.config.model_folder,
         )
+        metadata_path = self.config.save_metadata(self.residual_model_name)
+        print(f"Residual model metadata saved to: {metadata_path}")
         
         # Generate corrected training predictions
         predicted_residuals_train = self.residual_model.predict(self.X_train_covs, verbose=1)

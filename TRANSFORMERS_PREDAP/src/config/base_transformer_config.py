@@ -22,7 +22,7 @@ class BaseTransformerConfig(ABC):
     # ==================== CORE MODEL PARAMETERS ====================
     lookback: int = 14
     forecast: int = 7
-    code: str = "J00"
+    code: str = "DEMAND_DEMANDA_TOTAL"
     
     # ==================== MODEL ARCHITECTURE ====================
     head_size: int = 64
@@ -78,7 +78,7 @@ class BaseTransformerConfig(ABC):
     model_folder: str = '../transformer_outputs/models_covid_token'
 
     # Hyperparameter Search Lists
-    CODES_LIST: List[str] = field(default_factory=lambda: ["J00", "T14","M54"])
+    CODES_LIST: List[str] = field(default_factory=lambda: ["DEMAND_DEMANDA_TOTAL"])
     LOOKBACK_LIST: List[int] = field(default_factory=lambda: [7,14,30,182])
     FORECAST_LIST: List[int] = field(default_factory=lambda: [7,14,30,182, 365])
     HEAD_SIZE_LIST: List[int] = field(default_factory=lambda: [2,4,8])

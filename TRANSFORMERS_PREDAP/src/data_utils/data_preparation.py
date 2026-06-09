@@ -15,6 +15,7 @@ from src.data_utils.features import (
 #from src.data_utils.loader import read as read_csv
 from src.utils.experiments_utils import smart_read as read_csv
 from src.data_utils.normalizer import normalize_dataframe, inverse_transform_predictions
+from src.data_utils.column_mapping import resolve_column, resolve_feature_values
 from src.data_utils.features import (
     eliminate_covid_dates,
     add_covid_token,
@@ -46,14 +47,14 @@ def prepare_univariate_data(df ,code, lookback, forecast, cutoff_date = '2010-01
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)
+    code = resolve_column(df.columns, code.replace("#", ":"), "target code")
     df = cut_dataframe(df, cutoff_date,max_date)
     df = normalize_dataframe(df, target_code=code, scaler = scaler)
 
     # univariate scenario ...................................................
     # Only use the target column as input (Univariate Forecasting)
-    idx_code = df.columns.get_loc(code)
-    feature_cols = df.columns[idx_code]  
-    target_col = df.columns[idx_code]  # Get the target column 
+    target_col = resolve_column(df.columns, code, "target code")
+    feature_cols = target_col
 
     # Convert to numpy arrays
     X_raw = df[feature_cols].values.reshape(-1, 1)  # Ensure shape is (rows, 1)
@@ -75,18 +76,23 @@ def prepare_multivariate_data(df ,code, lookback, forecast, cutoff_date = '2010-
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)
+    code = resolve_column(df.columns, code.replace("#", ":"), "target code")
     df = cut_dataframe(df, cutoff_date,max_date)
     df = normalize_dataframe(df, target_code=code, scaler = scaler)
 
     # multivariate scenario ..................................................
     # Select feature columns (exclude timestamp & target)
-    idx_code = df.columns.get_loc(code)
     df_features = df.drop(columns = ['timestamp'])
-    target_col = df.columns[idx_code]  # Target code column
+    target_col = resolve_column(df.columns, code, "target code")
 
     # Convert DataFrame to numpy arrays
     if relevant_feature_cols is not None:
-        X_raw = df_features[relevant_feature_cols].values  
+        X_raw = resolve_feature_values(
+            df_features,
+            relevant_feature_cols,
+            "diagnostic predictor columns",
+            fill_missing_with_zero=True,
+        )
     else:
         X_raw = df_features.values
     Y_raw = df[target_col].values
@@ -103,27 +109,30 @@ def prepare_multivariate_data(df ,code, lookback, forecast, cutoff_date = '2010-
 
 
 def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date='2010-01-01', max_date='2025-09-30', covid_token=False, relevant_feature_cols=None, train=True, debug=False, univariate=True, eliminate_covid_data=False, covid_dates=None, split_ratio=0.8):
-    code = code.replace("#", ":")
     df = read_csv(csv_file)
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)
+    code = resolve_column(df.columns, code.replace("#", ":"), "target code")
     df = df[(df['timestamp'] >= cutoff_date) & (df['timestamp'] <= max_date)].reset_index(drop=True)
     train_df, test_df = split_train_test(df, split_ratio=split_ratio)
     df_use = train_df if train else test_df
 
     if univariate:
-        idx_code = df_use.columns.get_loc(code)
-        feature_cols = df_use.columns[idx_code]
-        target_col = df_use.columns[idx_code]
+        target_col = resolve_column(df_use.columns, code, "target code")
+        feature_cols = target_col
         X_raw = df_use[feature_cols].values.reshape(-1, 1)
         Y_raw = df_use[target_col].values
     else:
-        idx_code = df_use.columns.get_loc(code)
         df_features = df_use.drop(columns=['timestamp'])
-        target_col = df_use.columns[idx_code]
+        target_col = resolve_column(df_use.columns, code, "target code")
         if relevant_feature_cols is not None:
-            X_raw = df_features[relevant_feature_cols].values
+            X_raw = resolve_feature_values(
+                df_features,
+                relevant_feature_cols,
+                "diagnostic predictor columns",
+                fill_missing_with_zero=True,
+            )
         else:
             X_raw = df_features.values
         Y_raw = df_use[target_col].values
@@ -187,5 +196,4 @@ def split_train_test(df: pd.DataFrame,
     train = df.iloc[:n].reset_index(drop=True)
     test = df.iloc[n:].reset_index(drop=True)
     return train, test
-
 

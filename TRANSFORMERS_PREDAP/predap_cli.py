@@ -61,6 +61,8 @@ def _canonical_code_name(name: str) -> str:
     if canonical.startswith("DEMAND_"):
         canonical = canonical[len("DEMAND_"):]
     canonical = canonical.replace("__", "_").upper()
+    if canonical == "TOTAL":
+        canonical = "DEMANDA_TOTAL"
     aliases = {
         "VISI_SITUACIO_VISITA_N": "VISI_SITUACIO_VISITA_NO_PROGRAMADA",
         "VISI_SITUACIO_VISITA_P": "VISI_SITUACIO_VISITA_PROGRAMADA",
@@ -230,6 +232,7 @@ def _run_one_training(args: argparse.Namespace, code: str, lookback: int, foreca
 
 def cmd_train(args: argparse.Namespace) -> int:
     codes = args.codes or [args.code]
+    codes = _filter_codes_in_dataset(codes, args.data_path)
     lookbacks = args.lookbacks or [args.lookback]
     forecasts = args.forecasts or [args.forecast]
     if len(lookbacks) != len(forecasts):
@@ -378,7 +381,7 @@ def cmd_quantize(args: argparse.Namespace) -> int:
 
 
 def add_model_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--code", default="DEMAND_demanda_SERVEI_CODI_INF", help="Single demand or diagnosis code to process.")
+    parser.add_argument("--code", default="DEMAND_DEMANDA_TOTAL", help="Single demand or diagnosis code to process.")
     parser.add_argument("--codes", type=_csv_strings, help="Comma-separated list of codes. Overrides --code.")
     parser.add_argument("--lookback", type=int, default=7, help="Single lookback window, in days.")
     parser.add_argument("--forecast", type=int, default=7, help="Single forecast horizon, in days.")
@@ -420,9 +423,9 @@ def build_parser() -> argparse.ArgumentParser:
 Common examples:
   python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
   python predap_cli.py aquas -- --sample --all
-  python predap_cli.py train --stage univariate --code J00 --lookbacks 7,14 --forecasts 7,14
-  python predap_cli.py quantize --experiments EXP1 --codes J00,I10 --lookbacks 7,14 --forecasts 7,14
-  python predap_cli.py reconstruct --code J00 --prediction-start 2025-12-23 --prediction-end 2025-12-31
+  python predap_cli.py train --stage univariate --code TOTAL --lookbacks 7,14 --forecasts 7,14
+  python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14
+  python predap_cli.py reconstruct --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
 
 Use "python predap_cli.py <method> --help" to see all options for a method.
 """,
@@ -477,8 +480,8 @@ Arguments after "--" are passed unchanged to AQUAS.
   full         Run univariate, diagnostic, and seasonal in sequence.
 
 Examples:
-  python predap_cli.py train --stage univariate --code J00 --lookbacks 7,14 --forecasts 7,14
-  python predap_cli.py train --stage full --codes J00,I10,M54 --epochs 50 --batch-size 32
+  python predap_cli.py train --stage univariate --code TOTAL --lookbacks 7,14 --forecasts 7,14
+  python predap_cli.py train --stage full --codes TOTAL --epochs 50 --batch-size 32
 """,
     )
     add_model_args(train)
@@ -499,7 +502,7 @@ Examples:
   --prediction-start 2025-12-23 --prediction-end 2025-12-31
 
 Examples:
-  python predap_cli.py reconstruct --code J00 --prediction-start 2025-12-23 --prediction-end 2025-12-31
+  python predap_cli.py reconstruct --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
   python predap_cli.py reconstruct --all-codes --lookbacks 7,14,60 --forecasts 7,14,30 --no-delete-old
 """,
     )
@@ -521,7 +524,7 @@ Examples:
         help="Quantize MLflow models into production weight files.",
         description="Load trained MLflow models and save float16 production weights.",
         epilog="""Example:
-  python predap_cli.py quantize --experiments EXP1 --codes J00,I10 --lookbacks 7,14 --forecasts 7,14 --evaluate
+  python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
 """,
     )
     quantize.add_argument("--experiments", type=_csv_strings, required=True, help="Comma-separated MLflow experiment names to search.")

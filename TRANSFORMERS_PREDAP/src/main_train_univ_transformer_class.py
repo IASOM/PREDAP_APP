@@ -161,7 +161,7 @@ class UnivariateTransformerPipeline:
         
         start_time = time.perf_counter()
 
-        self.diagnostic_covariates_list = self.load_diagnostic_covariates()
+        self.diagnostic_covariates_list = None
         
         X, Y = data_preparation.prepare_data(
             self.data_path, 
@@ -503,14 +503,12 @@ if __name__ == "__main__":
     transformer_config = TransformerUnivConfig(
                             lookback=7,
                             forecast=7,
-                            code="T14",
+                            code="DEMAND_DEMANDA_TOTAL",
                             activation_function='gelu',
                             cutoff_date="2008-01-01",
                             evaluate_model = True,
                             positional_encoding = False,
-                            
                             )
 
     pipeline = UnivariateTransformerPipeline(transformer_config)
     model, model_name, loss, mae, mse, rmse, wape = pipeline.run_complete_pipeline()
-    

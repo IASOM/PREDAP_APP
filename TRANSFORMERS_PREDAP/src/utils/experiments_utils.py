@@ -6,13 +6,16 @@ import json
 import matplotlib.pyplot as plt
 import gc
 import ctypes
-from tensorflow.keras import backend as K
-import tensorflow as tf
 from typing import List
 
 import re
 
-from src.training.training_residual_transformer import load_trained_model
+try:
+    from tensorflow.keras import backend as K
+    import tensorflow as tf
+except ModuleNotFoundError:
+    K = None
+    tf = None
 
 
 _original_read_csv = pd.read_csv
@@ -20,7 +23,8 @@ _in_smart_read = False
 
 def cleanup_ram():
     plt.close('all')
-    K.clear_session()
+    if K is not None:
+        K.clear_session()
     gc.collect()
     try:
         ctypes.CDLL("libc.so.6").malloc_trim(0)
@@ -142,6 +146,8 @@ def compute_dynamic_batch_size(lookback, forecast):
     Returns:
     - int: Computed batch size.
     """
+    if tf is None:
+        return batch_size
     gpus = tf.config.list_physical_devices('GPU')
 
     if lookback <= 14 and forecast <= 14:
@@ -172,10 +178,12 @@ def memory_cleanup():
     and makes TensorFlow unable to use the GPU for the rest of the process.
     """
     # Clear Keras session (releases model graphs and cached tensors)
-    K.clear_session()
+    if K is not None:
+        K.clear_session()
     
     # Reset the default graph (TF1 compat, still useful for freeing resources)
-    tf.compat.v1.reset_default_graph()
+    if tf is not None:
+        tf.compat.v1.reset_default_graph()
     
     # Force Python garbage collection
     gc.collect()
@@ -190,12 +198,13 @@ def memory_cleanup():
         pass
     
     # Reset GPU memory stats (does NOT destroy the CUDA context)
-    gpus = tf.config.list_physical_devices('GPU')
-    for gpu in gpus:
-        try:
-            tf.config.experimental.reset_memory_stats(gpu)
-        except Exception:
-            pass
+    if tf is not None:
+        gpus = tf.config.list_physical_devices('GPU')
+        for gpu in gpus:
+            try:
+                tf.config.experimental.reset_memory_stats(gpu)
+            except Exception:
+                pass
 
 
 def extract_model_params(model_name):
@@ -221,7 +230,6 @@ def extract_model_params(model_name):
     else:
         print(f"Could not extract parameters from: {model_name}")
         return None, None
-
 
 
 

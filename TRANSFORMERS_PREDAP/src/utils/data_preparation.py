@@ -10,6 +10,7 @@ import numpy as np
 from src.core.data_utils import split_train_test
 from src.data_utils.loader import read as read_csv
 from src.data_utils.normalizer import normalize_dataframe, inverse_transform_predictions
+from src.data_utils.column_mapping import resolve_column, resolve_feature_values
 from src.data_utils.features import (
     eliminate_covid_dates,
     add_covid_token,
@@ -41,16 +42,16 @@ def cut_dataframe(df: pd.DataFrame, date_cutoff: str = "2010-01-01", max_date: s
 
     return df
 
-def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', max_date = '2021-06-30', covid_token = False, relevant_feature_cols = None,train = True, debug=False, univariate=True, scaler = None, eliminate_covid_data = False, covid_dates = None):
-    code = code.replace("#", ":")
+def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', max_date = '2021-06-30', covid_token = False, relevant_feature_cols = None,train = True, debug=False, univariate=True, scaler = None, eliminate_covid_data = False, covid_dates = None, split_ratio=0.8):
     start_time =time.time()
     # Load CSV or Parquet
     df = read_csv(csv_file)
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)
+    code = resolve_column(df.columns, code.replace("#", ":"), "target code")
     df = cut_dataframe(df, cutoff_date,max_date, csv_file)
-    train_df, test_df = split_train_test(df)
+    train_df, test_df = split_train_test(df, split_ratio=split_ratio)
     train_df, test_df = normalize_dataframe(train_df,test_df, csv_file, target_code=code, scaler = scaler)
 
     if train:
@@ -63,9 +64,8 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
         # Only use the target column as input (Univariate Forecasting)
         #feature_col = df.columns[-1]   # Use the target itself as input
         #target_col = df.columns[-1]    # The future target to predict
-        idx_code = df.columns.get_loc(code)
-        feature_cols = df.columns[idx_code]  
-        target_col = df.columns[idx_code]  # Get the target column 
+        target_col = resolve_column(df.columns, code, "target code")
+        feature_cols = target_col
 
         # Convert to numpy arrays
         X_raw = df[feature_cols].values.reshape(-1, 1)  # Ensure shape is (rows, 1)
@@ -74,16 +74,17 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
     else: 
         # multivariate scenario ..................................................
         # Select feature columns (exclude timestamp & target)
-        idx_code = df.columns.get_loc(code)
-        
+        target_col = resolve_column(df.columns, code, "target code")
         df_features = df.drop(columns = ['timestamp'])
-
-        
-        target_col = df.columns[idx_code]  # Target code column
     
         # Convert DataFrame to numpy arrays
         if relevant_feature_cols is not None:
-            X_raw = df_features[relevant_feature_cols].values  
+            X_raw = resolve_feature_values(
+                df_features,
+                relevant_feature_cols,
+                "diagnostic predictor columns",
+                fill_missing_with_zero=True,
+            )
         else:
             X_raw = df_features.values
         Y_raw = df[target_col].values
@@ -109,27 +110,30 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
 
 
 def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date='2010-01-01', max_date='2025-09-30', covid_token=False, relevant_feature_cols=None, train=True, debug=False, univariate=True, eliminate_covid_data=False, covid_dates=None, split_ratio=0.8):
-    code = code.replace("#", ":")
     df = read_csv(csv_file)
     if eliminate_covid_data:
         assert covid_dates is not None
         df = eliminate_covid_dates(df, covid_dates)
+    code = resolve_column(df.columns, code.replace("#", ":"), "target code")
     df = df[(df['timestamp'] >= cutoff_date) & (df['timestamp'] <= max_date)].reset_index(drop=True)
     train_df, test_df = split_train_test(df, split_ratio=split_ratio)
     df_use = train_df if train else test_df
 
     if univariate:
-        idx_code = df_use.columns.get_loc(code)
-        feature_cols = df_use.columns[idx_code]
-        target_col = df_use.columns[idx_code]
+        target_col = resolve_column(df_use.columns, code, "target code")
+        feature_cols = target_col
         X_raw = df_use[feature_cols].values.reshape(-1, 1)
         Y_raw = df_use[target_col].values
     else:
-        idx_code = df_use.columns.get_loc(code)
+        target_col = resolve_column(df_use.columns, code, "target code")
         df_features = df_use.drop(columns=['timestamp'])
-        target_col = df_use.columns[idx_code]
         if relevant_feature_cols is not None:
-            X_raw = df_features[relevant_feature_cols].values
+            X_raw = resolve_feature_values(
+                df_features,
+                relevant_feature_cols,
+                "diagnostic predictor columns",
+                fill_missing_with_zero=True,
+            )
         else:
             X_raw = df_features.values
         Y_raw = df_use[target_col].values
@@ -151,7 +155,7 @@ def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date=
     return X, Y
 
 
-def extract_dates(csv_file, code, lookback, forecast, train=True, cutoff_date='2010-01-01', max_date=MAX_DATE, eliminate_covid_data=False, covid_dates=None):
+def extract_dates(csv_file, code, lookback, forecast, train=True, cutoff_date='2010-01-01', max_date=MAX_DATE, eliminate_covid_data=False, covid_dates=None, split_ratio=0.8):
     df = read_csv(csv_file)
     if eliminate_covid_data:
         assert covid_dates is not None
@@ -163,7 +167,7 @@ def extract_dates(csv_file, code, lookback, forecast, train=True, cutoff_date='2
     max_dt = pd.Timestamp(max_date)
     df = df[(df['timestamp'] >= cutoff) & (df['timestamp'] <= max_dt)].reset_index(drop=True)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df_train, df_test = split_train_test(df)
+    df_train, df_test = split_train_test(df, split_ratio=split_ratio)
     df_use = df_train if train else df_test
     date_list = df_use['timestamp'].iloc[lookback : len(df_use) - forecast + 1].reset_index(drop=True)
     return date_list.tolist()

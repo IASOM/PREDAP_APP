@@ -4,11 +4,16 @@ from sklearn.base import clone
 import numpy as np
 import pandas as pd
 
+from src.data_utils.column_mapping import resolve_column
 
-def normalize_dataframe(df: pd.DataFrame, target_code: str = None, scaler: Any =None):
+
+def _normalize_single_dataframe(df: pd.DataFrame, target_code: str = None, scaler: Any = None):
     if 'timestamp' not in df.columns:
         raise KeyError("Expected a 'timestamp' column in the CSV.")
+    df = df.copy()
     df['timestamp'] = df['timestamp'].astype('datetime64[ns]')
+    if target_code is not None:
+        target_code = resolve_column(df.columns, target_code, "target code")
 
     if scaler is None:
         scaler = MinMaxScaler()
@@ -17,8 +22,9 @@ def normalize_dataframe(df: pd.DataFrame, target_code: str = None, scaler: Any =
         scaler_target = clone(scaler)
 
     codes = [code for code in df.columns if (code != 'timestamp' and code != target_code)]
-    scaler.fit(df[codes].values)
-    df[codes] = scaler.transform(df[codes].values)
+    if codes:
+        scaler.fit(df[codes].values)
+        df[codes] = scaler.transform(df[codes].values)
     if target_code is not None:
         scaler_target = scaler_target.fit(df[[target_code]].values)
         df[[target_code]] = scaler_target.transform(df[[target_code]].values)
@@ -26,10 +32,25 @@ def normalize_dataframe(df: pd.DataFrame, target_code: str = None, scaler: Any =
     return df
 
 
+def normalize_dataframe(df: pd.DataFrame, *args, target_code: str = None, scaler: Any = None):
+    if args and isinstance(args[0], pd.DataFrame):
+        train_df = df
+        test_df = args[0]
+        if len(args) >= 3 and target_code is None:
+            target_code = args[2]
+        return (
+            _normalize_single_dataframe(train_df, target_code=target_code, scaler=scaler),
+            _normalize_single_dataframe(test_df, target_code=target_code, scaler=scaler),
+        )
+    if args and target_code is None:
+        target_code = args[0]
+    return _normalize_single_dataframe(df, target_code=target_code, scaler=scaler)
+
+
 def inverse_transform_predictions(predictions, original_scale_df, code, lookback, forecast, cutoff_date='2010-01-01', max_date='2025-09-30', scaler = None, eliminate_covid_data=False, covid_dates=None, split_ratio = 0.8):
     from sklearn.preprocessing import MinMaxScaler
     from sklearn.base import clone
-    code = code.replace("#", ":")
+    code = resolve_column(original_scale_df.columns, code.replace("#", ":"), "target code")
     if eliminate_covid_data:
         assert covid_dates is not None
         # Filter out covid dates

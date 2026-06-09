@@ -72,6 +72,10 @@ class DiagnosticResidualTransformerConfig(BaseTransformerConfig):
         # Set diagnostic_covariates_path using the code from parent
         if self.diagnostic_covariates_path is None:
             self.diagnostic_covariates_path = f'../data/best_features/BEST_features_NOSMOOTH_{self.code}.xlsx'
+        elif self.diagnostic_covariates_path.endswith(".xlsx"):
+            self.diagnostic_covariates_path = self.diagnostic_covariates_path
+        elif self.diagnostic_covariates_path.endswith("_"):
+            self.diagnostic_covariates_path = self.diagnostic_covariates_path + f'{self.code}.xlsx'
         else:
             self.diagnostic_covariates_path = self.diagnostic_covariates_path + f'_{self.code}.xlsx'
     
@@ -164,8 +168,28 @@ class DiagnosticResidualTransformerPipeline:
         self.data_path = self.config.data_path
         
     def load_diagnostic_covariates(self):
+        if not os.path.exists(self.config.diagnostic_covariates_path):
+            print(
+                f"-> WARNING: Diagnostic covariates file not found: "
+                f"{self.config.diagnostic_covariates_path}. Continuing without diagnostic predictors."
+            )
+            self.diagnostic_covariates_list = []
+            return self.diagnostic_covariates_list
         diagnostic_covariates_df = pd.read_excel(self.config.diagnostic_covariates_path, engine='openpyxl')
-        self.diagnostic_covariates_list = list(diagnostic_covariates_df[diagnostic_covariates_df['LAG'] == self.config.forecast]['predictors'])[0].split(',')
+        matching_rows = diagnostic_covariates_df[diagnostic_covariates_df['LAG'] == self.config.forecast]
+        if matching_rows.empty:
+            print(
+                f"-> WARNING: No diagnostic covariates row found in "
+                f"{self.config.diagnostic_covariates_path} for LAG={self.config.forecast}. "
+                "Continuing without diagnostic predictors."
+            )
+            self.diagnostic_covariates_list = []
+            return self.diagnostic_covariates_list
+        self.diagnostic_covariates_list = [
+            item.strip()
+            for item in str(matching_rows['predictors'].iloc[0]).split(',')
+            if item.strip()
+        ]
     
         return self.diagnostic_covariates_list
 

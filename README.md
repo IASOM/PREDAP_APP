@@ -107,13 +107,13 @@ python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
 Entrenar un model simple:
 
 ```bash
-python predap_cli.py train --stage univariate --code J00 --lookback 7 --forecast 7
+python predap_cli.py train --stage univariate --code TOTAL --lookback 7 --forecast 7
 ```
 
 Reconstruir i predir amb models quantitzats:
 
 ```bash
-python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
+python predap_cli.py reconstruct --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
 ```
 
 ## Instal.lacio estable entre maquines
@@ -213,7 +213,7 @@ docker compose up -d
 
 ```bash
 docker compose exec mi-api-ia bash
-python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF \
+python predap_cli.py reconstruct --code TOTAL \
 	--data-path /app/TRANSFORMERS_PREDAP/AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/sample/multiyear_output/finals/demand_diagnosis_joined.parquet \
 	--prediction-start 2025-12-23 --prediction-end 2025-12-31
 ```

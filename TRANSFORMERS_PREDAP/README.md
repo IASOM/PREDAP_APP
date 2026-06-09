@@ -75,8 +75,8 @@ Les comandes s'executen directament amb Python:
 python predap_cli.py --help
 python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
 python predap_cli.py aquas -- --sample --all
-python predap_cli.py train --stage univariate --code J00 --lookbacks 7,14 --forecasts 7,14
-python predap_cli.py reconstruct --code DEMAND_demanda_SERVEI_CODI_INF --prediction-start 2025-12-23 --prediction-end 2025-12-31
+python predap_cli.py train --stage univariate --code TOTAL --lookbacks 7,14 --forecasts 7,14
+python predap_cli.py reconstruct --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
 ```
 
 Per comoditat també hi ha un wrapper Python:
@@ -225,7 +225,7 @@ Exemple curt:
 ```bash
 python predap_cli.py train \
   --stage full \
-  --codes J00,I10,M54 \
+  --codes TOTAL \
   --lookbacks 7,14 \
   --forecasts 7,14 \
   --data-path ../data/FINAL_DB/full_CAT1.parquet \
@@ -239,7 +239,7 @@ Per entrenar nomes el model univariant:
 ```bash
 python predap_cli.py train \
   --stage univariate \
-  --code J00 \
+  --code TOTAL \
   --lookbacks 7 \
   --forecasts 7
 ```
@@ -269,7 +269,7 @@ Els pesos es guarden sota:
 
 ```bash
 python predap_cli.py reconstruct \
-  --code DEMAND_demanda_SERVEI_CODI_INF \
+  --code TOTAL \
   --data-path AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/sample/multiyear_output/finals/demand_diagnosis_joined.parquet \
   --old-data-path ../data/FINAL_DB/finals_combined.csv \
   --model-folder ../quantized_models \

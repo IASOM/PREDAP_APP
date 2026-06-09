@@ -16,6 +16,7 @@ import pandas as pd
 import numpy as np
 
 from src.model_architechture.layers import PositionalEncoding, RevIN, CustomCosineDecay
+from src.data_utils.column_mapping import resolve_columns
 
 
 # Add the src directory to path for module imports
@@ -248,18 +249,22 @@ def filter_diagnostics_covariates(df, diag_codes):
     if isinstance(diag_codes, str):
         diag_codes = [diag_codes]
     
-    # Filter columns
-    cols_to_keep = ['timestamp'] + [code for code in diag_codes if code in df.columns]
+    resolved_codes, missing_codes = resolve_columns(
+        df.columns,
+        diag_codes,
+        "diagnostic covariate columns",
+    )
+    cols_to_keep = ['timestamp'] + resolved_codes
     
     if len(cols_to_keep) <= 1:
-        raise ValueError("No valid diagnostic codes found in the DataFrame.")
+        print("-> WARNING: No valid diagnostic covariates found in the DataFrame.")
+        return df[['timestamp']].copy()
     
     filtered_df = df[cols_to_keep].copy()
     
     print(f"Filtered DataFrame to keep columns: {cols_to_keep}")
     
     return filtered_df
-
 
 
 

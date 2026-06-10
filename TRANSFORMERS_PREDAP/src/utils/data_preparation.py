@@ -69,7 +69,9 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
 
         # Convert to numpy arrays
         X_raw = df[feature_cols].values.reshape(-1, 1)  # Ensure shape is (rows, 1)
+        X_raw = X_raw.astype(np.float32)  # Ensure float32 dtype
         Y_raw = df[target_col].values # Target values
+        Y_raw = Y_raw.astype(np.float32)  # Ensure float32 dtype
         print(X_raw.shape, Y_raw.shape)
     else: 
         # multivariate scenario ..................................................
@@ -86,11 +88,11 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
                 fill_missing_with_zero=True,
             )
         else:
-            X_raw = df_features.values
-        Y_raw = df[target_col].values
+            X_raw = df_features.values.astype(np.float32)
+        Y_raw = df[target_col].values.astype(np.float32)  # Ensure float32 dtype
     if covid_token:
         df_covid = add_covid_token(df)
-        covid_feature = df_covid['covid_token'].values.reshape(-1, 1)
+        covid_feature = df_covid['covid_token'].values.reshape(-1, 1).astype(np.float32)
         
         X_raw = np.hstack((X_raw, covid_feature))
     # Generate rolling sequences
@@ -100,7 +102,7 @@ def prepare_data(csv_file,code, lookback, forecast, cutoff_date = '2010-01-01', 
         Y.append(Y_raw[i + lookback : i + lookback + forecast])  # Future `forecast` values
 
     # Convert to numpy arrays
-    X, Y = np.array(X), np.array(Y)
+    X, Y = np.array(X, dtype=np.float32), np.array(Y, dtype=np.float32)
 
     if debug:
         print(f"Processed Data Shapes: X={X.shape}, Y={Y.shape}")  
@@ -122,8 +124,8 @@ def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date=
     if univariate:
         target_col = resolve_column(df_use.columns, code, "target code")
         feature_cols = target_col
-        X_raw = df_use[feature_cols].values.reshape(-1, 1)
-        Y_raw = df_use[target_col].values
+        X_raw = df_use[feature_cols].values.reshape(-1, 1).astype(np.float32)
+        Y_raw = df_use[target_col].values.astype(np.float32)
     else:
         target_col = resolve_column(df_use.columns, code, "target code")
         df_features = df_use.drop(columns=['timestamp'])
@@ -135,12 +137,12 @@ def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date=
                 fill_missing_with_zero=True,
             )
         else:
-            X_raw = df_features.values
-        Y_raw = df_use[target_col].values
+            X_raw = df_features.values.astype(np.float32)
+        Y_raw = df_use[target_col].values.astype(np.float32)
 
     if covid_token:
         df_covid = add_covid_token(df_use)
-        covid_feature = df_covid['covid_token'].values.reshape(-1, 1)
+        covid_feature = df_covid['covid_token'].values.reshape(-1, 1).astype(np.float32)
         X_raw = __import__('numpy').hstack((X_raw, covid_feature))
 
     X, Y = [], []
@@ -148,8 +150,8 @@ def prepare_data_not_normalized(csv_file, code, lookback, forecast, cutoff_date=
         X.append(X_raw[i : i + lookback])
         Y.append(Y_raw[i + lookback : i + lookback + forecast])
     import numpy as _np
-    X = _np.array(X).astype(_np.float32)
-    Y = _np.array(Y).astype(_np.float32)
+    X = _np.array(X, dtype=_np.float32)
+    Y = _np.array(Y, dtype=_np.float32)
     if debug:
         print(f"Processed Data Shapes: X={X.shape}, Y={Y.shape}")
     return X, Y

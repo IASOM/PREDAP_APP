@@ -98,7 +98,9 @@ def resolve_feature_values(
         if not requested:
             continue
         if requested in df_features.columns:
-            values.append(df_features[requested].values)
+            # Convert to float32 to ensure numeric dtype
+            col_values = df_features[requested].values.astype(np.float32, errors='ignore')
+            values.append(col_values)
             continue
         resolved = lookup.get(canonical_column_name(requested))
         if resolved is None:
@@ -106,7 +108,9 @@ def resolve_feature_values(
             if fill_missing_with_zero:
                 values.append(np.zeros(len(df_features), dtype=np.float32))
         else:
-            values.append(df_features[resolved].values)
+            # Convert to float32 to ensure numeric dtype
+            col_values = df_features[resolved].values.astype(np.float32, errors='ignore')
+            values.append(col_values)
             if resolved != requested:
                 changed += 1
     if missing:
@@ -120,4 +124,9 @@ def resolve_feature_values(
         print(f"-> INFO: Mapped {changed} {role} to current dataset column names.")
     if not values:
         return np.empty((len(df_features), 0), dtype=np.float32)
-    return np.column_stack(values)
+    # Stack values and ensure result is float32
+    stacked = np.column_stack(values)
+    if stacked.dtype == object:
+        # If stacking resulted in object array, try converting to float32
+        stacked = stacked.astype(np.float32)
+    return stacked

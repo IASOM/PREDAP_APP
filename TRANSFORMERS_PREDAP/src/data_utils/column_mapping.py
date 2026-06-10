@@ -83,6 +83,14 @@ def resolve_columns(
     return resolved_columns, missing
 
 
+def _to_float32(series: pd.Series) -> np.ndarray:
+    try:
+        return series.to_numpy(dtype=np.float32)
+    except (TypeError, ValueError):
+        numeric_series = pd.to_numeric(series, errors="coerce").fillna(0).astype(np.float32)
+        return numeric_series.to_numpy()
+
+
 def resolve_feature_values(
     df_features: pd.DataFrame,
     requested_columns: List[str],
@@ -99,7 +107,7 @@ def resolve_feature_values(
             continue
         if requested in df_features.columns:
             # Convert to float32 to ensure numeric dtype
-            col_values = df_features[requested].values.astype(np.float32, errors='ignore')
+            col_values = _to_float32(df_features[requested])
             values.append(col_values)
             continue
         resolved = lookup.get(canonical_column_name(requested))
@@ -109,7 +117,7 @@ def resolve_feature_values(
                 values.append(np.zeros(len(df_features), dtype=np.float32))
         else:
             # Convert to float32 to ensure numeric dtype
-            col_values = df_features[resolved].values.astype(np.float32, errors='ignore')
+            col_values = _to_float32(df_features[resolved])
             values.append(col_values)
             if resolved != requested:
                 changed += 1
@@ -128,5 +136,5 @@ def resolve_feature_values(
     stacked = np.column_stack(values)
     if stacked.dtype == object:
         # If stacking resulted in object array, try converting to float32
-        stacked = stacked.astype(np.float32)
+        stacked = np.asarray(stacked, dtype=np.float32)
     return stacked

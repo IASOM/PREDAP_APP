@@ -266,6 +266,8 @@ def _run_one_training(args: argparse.Namespace, code: str, lookback: int, foreca
 
 
 def cmd_train(args: argparse.Namespace) -> int:
+    if args.stage == "diagnostics":
+        args.stage = "diagnostic"
     codes = args.codes or [args.code]
     codes = _filter_codes_in_dataset(codes, args.data_path)
     temporal_pairs = _temporal_pairs(
@@ -531,7 +533,12 @@ Examples:
 """,
     )
     add_model_args(train)
-    train.add_argument("--stage", choices=["univariate", "diagnostic", "seasonal", "full"], default="full", help="Training stage or complete stack to run.")
+    train.add_argument(
+        "--stage",
+        choices=["univariate", "diagnostic", "diagnostics", "seasonal", "full"],
+        default="full",
+        help="Training stage or complete stack to run. 'diagnostics' is accepted as an alias for 'diagnostic'.",
+    )
     train.add_argument("--diagnostic-covariates-prefix", help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
     train.set_defaults(func=cmd_train)
 

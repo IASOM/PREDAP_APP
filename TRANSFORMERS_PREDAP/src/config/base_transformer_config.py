@@ -46,14 +46,15 @@ class BaseTransformerConfig(ABC):
     save_train_history: bool = True
     
     # ==================== DATA PARAMETERS ====================
-    data_path: str = '../data/FINAL_DB/full_CAT1.parquet'
-    diagnostic_covariates_path: str = f'../data/best_features/BEST_features_NOSMOOTH_'
-    production_predictions_dir: str = "../production_predictions/final_output_predictions"
-    production_predictions_file: str = "../production_predictions/final_output_predictions.parquet"
-    production_metrics_file: str = "../production_predictions/production_evaluation_metrics.parquet"
+    # Points to AQUAS_DATA_RETRIEVAL output (relative to TRANSFORMERS_PREDAP root)
+    data_path: str = 'AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet'
+    diagnostic_covariates_path: str = 'data/best_features/BEST_features_NOSMOOTH_'
+    production_predictions_dir: str = 'production_predictions/final_output_predictions'
+    production_predictions_file: str = 'production_predictions/final_output_predictions.parquet'
+    production_metrics_file: str = 'production_predictions/production_evaluation_metrics.parquet'
     
     cutoff_date: str = "2008-01-01"
-    max_date: str = "2025-12-31"#"2021-06-30"#
+    max_date: str = "2025-12-31"
     final_cutoff_date: Optional[str] = None
     positional_encoding: bool = True
     default_split_ratio: float = 0.8

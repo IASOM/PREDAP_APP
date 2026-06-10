@@ -33,11 +33,11 @@ class BaseTransformerConfig(ABC):
     shuffle_data: bool = True
     save_train_history: bool = True
 
-    data_path: str = "../data/FINAL_DB/full_CAT1.parquet"
-    diagnostic_covariates_path: str = "../data/best_features/BEST_features_NOSMOOTH_"
-    production_predictions_dir: str = "../production_predictions/final_output_predictions"
-    production_predictions_file: str = "../production_predictions/final_output_predictions.parquet"
-    production_metrics_file: str = "../production_predictions/production_evaluation_metrics.parquet"
+    data_path: str = "../../AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet"
+    diagnostic_covariates_path: str = "../../data/best_features/BEST_features_NOSMOOTH_"
+    production_predictions_dir: str = "../../production_predictions/final_output_predictions"
+    production_predictions_file: str = "../../production_predictions/final_output_predictions.parquet"
+    production_metrics_file: str = "../../production_predictions/production_evaluation_metrics.parquet"
 
     cutoff_date: str = "2008-01-01"
     final_cutoff_date: str = "2025-12-31"

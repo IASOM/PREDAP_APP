@@ -7,6 +7,8 @@ import tensorflow as tf
 import numpy as np
 import os
 import sys
+import re
+from pathlib import Path
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -53,6 +55,40 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
     def __init__(self, config: BaseTransformerConfig):
         self.config = config
         self.config.print_config()
+    
+    @staticmethod
+    def _canonicalize_code(code: str) -> str:
+        """Canonicalize code name to match training naming convention.
+        
+        Converts user input (e.g., 'TOTAL') to canonical form (e.g., 'DEMANDA_TOTAL').
+        Handles special aliases and formatting rules.
+        """
+        canonical = str(code).strip().replace("#", ":")
+        if canonical.startswith("DEMAND_"):
+            canonical = canonical[len("DEMAND_"):]
+        canonical = canonical.replace("__", "_").upper()
+        
+        # Special case: TOTAL becomes DEMANDA_TOTAL
+        if canonical == "TOTAL":
+            canonical = "DEMANDA_TOTAL"
+        
+        # Apply aliases
+        aliases = {
+            "VISI_SITUACIO_VISITA_N": "VISI_SITUACIO_VISITA_NO_PROGRAMADA",
+            "VISI_SITUACIO_VISITA_P": "VISI_SITUACIO_VISITA_PROGRAMADA",
+            "VISI_SITUACIO_VISITA_R": "VISI_SITUACIO_VISITA_URGENT",
+            "SERVEI_CODI_MF": "SERVEI_CODI_MEDFAM",
+        }
+        for legacy, current in aliases.items():
+            canonical = re.sub(
+                rf"(^|_){re.escape(legacy)}($|_)",
+                lambda m: f"{m.group(1)}{current}{m.group(2)}",
+                canonical,
+            )
+        
+        # Remove non-alphanumeric characters except underscore
+        canonical = re.sub(r"[^A-Z0-9]+", "_", canonical).strip("_")
+        return canonical
 
 
     def load_mlflow_model(self, run_id, model_name_in_run, custom_objects=None):
@@ -154,40 +190,99 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             lookback (int): The lookback period, used in the naming convention.
         Returns:
             None: The function saves the weights to disk and does not return any value."""
-        save_weights_path =  f"../quantized_models/{code}/{model_name}/{code}_{model_name}_{forecast}fh_{lookback}lb_f16_weights.h5"
+        # Quantized models saved relative to project root
+        save_weights_path = f"quantized_models/{code}/{model_name}/{code}_{model_name}_{forecast}fh_{lookback}lb_f16_weights.h5"
         if not os.path.exists(os.path.dirname(save_weights_path)):
             os.makedirs(os.path.dirname(save_weights_path))
         quant_model.save_weights(save_weights_path)
-        print(f"Quantized weights saved to {save_weights_path}")
+        print(f"✓ Quantized weights saved to {save_weights_path}")
 
-    def load_mlflow_run_id_by_name(self, exp_names, code, forecast, lookback, model_type, lr = 1e-5):
+    def load_mlflow_run_id_by_name(self, exp_names, code, forecast, lookback, model_type, lr=1e-5):
         """Load the mlflow run ID for a given model configuration based on a structured naming convention.
-        Args:
-            exp_names (list of str): A list of mlflow experiment names to search within.
-            code (str): The code identifier for the dataset/model, used in the naming convention.
-            forecast (int): The forecast horizon, used in the naming convention.
-            lookback (int): The lookback period, used in the naming convention.
-            model_type (str): The type of model (e.g., "univariate_model", "diagnostics_model", "seasonal_model"), used in the naming convention.
-            lr (float, optional): The learning rate used in the model training, used in the naming convention. Default is 1e-5.
-        Returns:
-            str: The mlflow run ID that matches the specified configuration.
-        Raises:
-            ValueError: If no run is found that matches the specified configuration.
-        """
-
-        #run_name_prefix = f"full_TRANSFORMER3_transformer_{code}_lb{lookback}_fh{forecast}"
-        run_name_prefix = f"1.0_Production_TRANSFORMER_{code}_lb{lookback}_fh{forecast}"
-        filter_string = f"attributes.run_name LIKE '{run_name_prefix}%'"
         
-        runs = mlflow.search_runs(experiment_names = exp_names,
-                                filter_string=filter_string, 
-                                order_by=["start_time DESC"],
-                                max_results=1)
+        Args:
+            exp_names (list of str or str): MLflow experiment name(s) to search within.
+            code (str): The code identifier (will be canonicalized to match training format).
+            forecast (int): The forecast horizon.
+            lookback (int): The lookback period.
+            model_type (str): The type of model (unused, kept for compatibility).
+            lr (float, optional): Learning rate (unused, kept for compatibility).
+            
+        Returns:
+            str: The MLflow run ID that matches the configuration.
+            
+        Raises:
+            ValueError: If experiments don't exist or no matching run is found.
+        """
+        # Ensure exp_names is a list
+        if isinstance(exp_names, str):
+            exp_names = [exp_names]
+        
+        # Canonicalize the code to match training naming convention
+        canonical_code = self._canonicalize_code(code)
+        print(f"\n📊 MLflow Run Search:")
+        print(f"  Input code: {code}")
+        print(f"  Canonical code: {canonical_code}")
+        print(f"  Lookback: {lookback}, Forecast: {forecast}")
+        print(f"  Searching experiments: {exp_names}")
+        
+        # Validate that experiments exist
+        for exp_name in exp_names:
+            try:
+                exp = mlflow.get_experiment_by_name(exp_name)
+                if exp is None:
+                    raise ValueError(f"Experiment '{exp_name}' not found in MLflow tracking server")
+                print(f"  ✓ Found experiment: {exp_name} (ID: {exp.experiment_id})")
+            except Exception as e:
+                raise ValueError(f"Error accessing experiment '{exp_name}': {str(e)}")
+        
+        # Construct run name prefix with canonicalized code
+        run_name_prefix = f"1.0_Production_TRANSFORMER_{canonical_code}_lb{lookback}_fh{forecast}"
+        filter_string = f"attributes.run_name LIKE '{run_name_prefix}%'"
+        print(f"  Search prefix: {run_name_prefix}")
+        print(f"  Filter: {filter_string}")
+        
+        try:
+            runs = mlflow.search_runs(
+                experiment_names=exp_names,
+                filter_string=filter_string,
+                order_by=["start_time DESC"],
+                max_results=5  # Get top 5 to show options
+            )
+        except Exception as e:
+            raise ValueError(f"MLflow search error: {str(e)}")
         
         if runs.empty:
-            raise ValueError(f"No run found starting with '{run_name_prefix}' in '{exp_names}'")
+            # Try to provide helpful suggestions by searching for similar runs
+            print(f"\n  ✗ No exact match found for prefix: {run_name_prefix}")
+            print(f"\n  Searching for similar runs...")
+            try:
+                all_runs = mlflow.search_runs(
+                    experiment_names=exp_names,
+                    filter_string=f"attributes.run_name LIKE '1.0_Production_TRANSFORMER_%'",
+                    max_results=10
+                )
+                if not all_runs.empty:
+                    print(f"  Available runs for code '{canonical_code}':")
+                    for idx, run in all_runs.iterrows():
+                        run_name = run["tags.mlflow.runName"] if "tags.mlflow.runName" in run.index else run["tags.run_name"] if "tags.run_name" in run.index else run.get("run_name", "N/A")
+                        print(f"    - {run_name}")
+            except:
+                pass
+            
+            raise ValueError(
+                f"No run found starting with '{run_name_prefix}' in experiments {exp_names}. "
+                f"Check that training was completed for code={code} (canonical: {canonical_code}), "
+                f"lookback={lookback}, forecast={forecast}."
+            )
         
-        return runs.iloc[0].run_id
+        # Found the run
+        found_run = runs.iloc[0]
+        run_name = found_run.get("tags.mlflow.runName", found_run.get("tags.run_name", "N/A"))
+        print(f"  ✓ Found run: {run_name}")
+        print(f"  Run ID: {found_run.run_id}")
+        
+        return found_run.run_id
     
     def eval_quantization_impact(self, input_directory, code, lookback, forecast,cutoff_date, 
                                  max_date,scaler, univ_model, diagnostics_model, seasonal_model, 
@@ -306,41 +401,60 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"Original WAPE: {seasonal_wape:.4f}%, Quantized WAPE: {original_quant_wape:.4f}%")
         print("================================================================\n")
     
-    def run_quantization_pipeline(self,exp_names, input_directory, code, lookback, forecast, cutoff_date, max_date, scaler, eliminate_covid_data=False, covid_dates=None):
+    def run_quantization_pipeline(self, exp_names, input_directory, code, lookback, forecast, cutoff_date, max_date, scaler, eliminate_covid_data=False, covid_dates=None):
         """Run the full model quantization pipeline: load models, quantize weights, save quantized weights, and evaluate performance impact.
+        
         Args:
-            exp_names (list of str): A list of mlflow experiment names to search within for model loading.
+            exp_names (list of str or str): MLflow experiment name(s) to search within for model loading.
             input_directory (str): The directory path where the test data is stored.
-            code (str): The code identifier for the dataset/model, used in data preparation and model loading.
-            lookback (int): The lookback period, used in data preparation and model loading.
-            forecast (int): The forecast horizon, used in data preparation and model loading.
+            code (str): The code identifier for the dataset/model (will be canonicalized).
+            lookback (int): The lookback period.
+            forecast (int): The forecast horizon.
             cutoff_date (datetime): The cutoff date for the test data.
             max_date (datetime): The maximum date for the test data.
-            scaler (object): The scaler object used for data normalization. 
-            eliminate_covid_data (bool, optional): Whether to eliminate COVID-19 data from the test set. Default is False.
-            covid_dates (list of str, optional): A list of date strings representing COVID-19 periods to eliminate if eliminate_covid_data is True. Default is None.
+            scaler (object): The scaler object used for data normalization.
+            eliminate_covid_data (bool, optional): Whether to eliminate COVID-19 data. Default is False.
+            covid_dates (list of str, optional): COVID-19 periods to eliminate. Default is None.
+            
         Returns:
-            tuple: A tuple containing the original univariate model, diagnostics model, seasonal model, and their quantized counterparts.
+            tuple: (univ_model, diagnostics_model, seasonal_model, quant_univ_model, quant_diagnostics_model, quant_seasonal_model)
         """
         univ_model_name_in_run = "univariate_model"
         diag_model_name_in_run = "residual_diagnostics_model"
         seasonal_model_name_in_run = "residual_seasonal_model"
 
-        run_id = self.load_mlflow_run_id_by_name(exp_names=exp_names, code=code, forecast=forecast, lookback=lookback, model_type=None, lr=1e-5)
-
-        univ_model = self.load_mlflow_model(run_id, univ_model_name_in_run, custom_objects= CUSTOM_OBJECTS_UNIV) 
-        diagnostics_model = self.load_mlflow_model(run_id, diag_model_name_in_run, custom_objects= CUSTOM_OBJECTS_RESIDUAL)
-        seasonal_model = self.load_mlflow_model(run_id, seasonal_model_name_in_run, custom_objects= CUSTOM_OBJECTS_RESIDUAL)
-            
-
+        print(f"\n{'='*70}")
+        print(f"QUANTIZATION PIPELINE - Loading Models")
+        print(f"{'='*70}")
+        
+        run_id = self.load_mlflow_run_id_by_name(
+            exp_names=exp_names,
+            code=code,
+            forecast=forecast,
+            lookback=lookback,
+            model_type=None,
+            lr=1e-5
+        )
+        
+        print(f"\n📥 Loading quantized models from run {run_id}...")
+        univ_model = self.load_mlflow_model(run_id, univ_model_name_in_run, custom_objects=CUSTOM_OBJECTS_UNIV)
+        diagnostics_model = self.load_mlflow_model(run_id, diag_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+        seasonal_model = self.load_mlflow_model(run_id, seasonal_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+        print(f"✓ Models loaded successfully")
+        
+        print(f"\n⚙️  Quantizing model weights...")
         quant_univ_model = self.manual_weight_quantization(univ_model, model_name="univariate_model")
         quant_diagnostics_model = self.manual_weight_quantization(diagnostics_model, model_name="diagnostics_model")
         quant_seasonal_model = self.manual_weight_quantization(seasonal_model, model_name="seasonal_model")
-
+        print(f"✓ Quantization complete")
+        
+        print(f"\n💾 Saving quantized weights...")
         self.save_quantized_model_weights(quant_univ_model, "univariate_model", code, forecast, lookback)
         self.save_quantized_model_weights(quant_diagnostics_model, "diagnostics_model", code, forecast, lookback)
         self.save_quantized_model_weights(quant_seasonal_model, "seasonal_model", code, forecast, lookback)
-
+        print(f"✓ Weights saved successfully")
+        
+        print(f"\n{'='*70}\n")
         return univ_model, diagnostics_model, seasonal_model, quant_univ_model, quant_diagnostics_model, quant_seasonal_model
 
 

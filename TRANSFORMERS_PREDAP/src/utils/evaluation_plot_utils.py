@@ -7,6 +7,7 @@
 import time
 import pandas as pd
 import os
+from pathlib import Path
 import numpy as np
 import tensorflow as tf
 import numpy as np
@@ -20,6 +21,10 @@ from src.evaluation.plotting import (
 )
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.stats import ttest_ind, mannwhitneyu
+
+# Ensure plots directory exists
+PLOTS_DIR = Path("plots/plots_residual_transformers")
+PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def plot_predictions_with_waves(Y_test, predictions, date_list, df_waves, waves=True, plt_show=False, model_name = "Model"):
@@ -53,9 +58,9 @@ def plot_predictions_with_waves(Y_test, predictions, date_list, df_waves, waves=
     plt.ylim(0, 1)
     plt.xticks([date_list[i] for i in indices], [date_labels[i] for i in indices], rotation=45)
     plt.grid()
-    if not os.path.exists("plots/plots_residual_transformer"):
-        os.makedirs("plots/plots_residual_transformer", exist_ok=True)
-    plt.savefig(f"plots/plots_residual_transformer/predictions_with_waves_{model_name}.png")
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = PLOTS_DIR / f"predictions_with_waves_{model_name}.png"
+    plt.savefig(str(output_path))
     if plt_show:
         plt.show()
     plt.close()
@@ -169,10 +174,9 @@ def plot_stepwise_errors(Y_test, predictions, model_name = "Model", plt_show = F
     plt.legend()
     plt.grid()
     plt.xticks(step_range)
-    if not os.path.exists("plots/plots_residual_transformer"):
-        os.makedirs("plots/plots_residual_transformer", exist_ok=True)
-    
-    plt.savefig(f"plots/plots_residual_transformers/stepwise_errors_{model_name}.png")
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = PLOTS_DIR / f"stepwise_errors_{model_name}.png"
+    plt.savefig(str(output_path))
     if plt_show:
         plt.show()
     plt.close()
@@ -241,9 +245,9 @@ def plot_errors_over_time_with_waves(Y_test, predictions, date_list, df_waves, w
         # Apply y-limit if provided
         if ylim_range is not None:
             plt.ylim(ylim_range)
-        if not os.path.exists("plots/plots_residual_transformer"):
-            os.makedirs("plots/plots_residual_transformer", exist_ok=True)
-        plt.savefig(f"plots/plots_residual_transformers/{title.replace(' ', '_').lower()}_over_time_{model_name}.png")
+        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+        output_path = PLOTS_DIR / f"{title.replace(' ', '_').lower()}_over_time_{model_name}.png"
+        plt.savefig(str(output_path))
         if plt_show:
             plt.show()
         plt.close()

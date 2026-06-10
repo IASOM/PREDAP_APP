@@ -60,23 +60,20 @@ if __name__ == "__main__":
     FINAL_LOOKBACK = 182
     FINAL_FORECAST = 365
 
-    #input_directory = '../data/FINAL_DB/full_CAT1.parquet'
-    #input_directory = '../data/FINAL_DB/finals_combined.csv'
-    # Point to the expected sample output file (do not read it yet — it may
-    # be created by `create_multiyear_sample` below). Use a path string so
-    # downstream code can decide when to read it.
-    input_directory = 'AQUAS_DATA_RETRIEVAL/data/sample/multilayer_output/finals/demanda_diagnostics_joined.parquet'
-    old_input_directory = '../data/FINAL_DB/finals_combined.csv'
+    # Points to AQUAS_DATA_RETRIEVAL output (relative to TRANSFORMERS_PREDAP root)
+    input_directory = 'AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet'
+    old_input_directory = 'AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet'
 
-    #model_folder = '../transformer_outputs/models_covid_token'
-    output_path = f"../production_predictions/final_output_predictions"
-    metrics_df_path = "../production_predictions/production_evaluation_metrics.parquet"
+    # Output paths relative to TRANSFORMERS_PREDAP root
+    output_path = f"production_predictions/final_output_predictions"
+    metrics_df_path = "production_predictions/production_evaluation_metrics.parquet"
     scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     max_date = '2025-12-31'
     cutoff_date = '2008-01-01'
     eliminate_covid_data = False
     covid_dates = None
-    model_folder = "../quantized_models"
+    # Points to quantized models directory (saved by quantization pipeline)
+    model_folder = "quantized_models"
     head_size = 32
     num_heads = 8
     ff_dim = 512
@@ -86,9 +83,10 @@ if __name__ == "__main__":
 
     simulation_dates = pd.date_range(start='2023-10-01', end='2023-10-31', freq='D')
     for date in simulation_dates:
-        input_dir = f"AQUAS_DATA_RETRIEVAL/data/sample/multilayer_input/"
-        out_dir = f"AQUAS_DATA_RETRIEVAL/data/sample/multilayer_output/"
-        input_directory = f"AQUAS_DATA_RETRIEVAL/data/sample/multilayer_output/finals/demand_diagnosis_joined.parquet"
+        # AQUAS output paths (relative to TRANSFORMERS_PREDAP root)
+        input_dir = f"AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/input/"
+        out_dir = f"AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/output/"
+        input_directory = f"AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet"
         str_date = date.strftime("%Y-%m-%d")
         custom_args = [
         "--start", "2008-01-01",

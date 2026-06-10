@@ -4,10 +4,10 @@ defaults:
   #- override hydra/launcher: joblib
 
 # Complete self-contained configuration for grid search
-# Data configuration
+# Data configuration (points to AQUAS_DATA_RETRIEVAL output)
 data:
-  data_path: '../data/FINAL_DB/demand_diagnosis_joined.parquet'
-  codes_path: '../data/FINAL_DB/target_codes.json'
+  data_path: 'AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet'
+  codes_path: 'AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/target_codes.json'
 
 experiment_setup: "7_7"  # Default experiment setup
 

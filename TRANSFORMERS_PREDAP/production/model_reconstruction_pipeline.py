@@ -450,7 +450,9 @@ class ModelPredictionPipeline(DataPreparationInProduction):
                 auxiliary_output_df["init_forecast_date"] = init_forecast_date
                 auxiliary_output_df["final_forecast_date"] = final_forecast_date
                 auxiliary_output_df["code"] = code
+                auxiliary_output_df["lookback"] = lookback
                 auxiliary_output_df["forecast"] = forecast
+                auxiliary_output_df["forecast_step"] = np.arange(1, forecast + 1)
                 auxiliary_output_df["predictions"] = quant_pred_corrected_seasonal_production.flatten()[:forecast]
                 auxiliary_output_df["ci_lower"] = ci_lower
                 auxiliary_output_df["ci_upper"] = ci_upper
@@ -482,7 +484,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             base_dir=output_path,
             format="parquet",
             partitioning=["code"],
-            existing_data_behavior="overwrite_or_ignore"
+            existing_data_behavior="delete_matching"
         )
 
     def compute_code_prediction_features(
@@ -528,9 +530,19 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         df_code["target_date"] = pd.to_datetime(df_code["target_date"], errors="coerce")
         if "forecast_date" in df_code.columns:
             df_code["forecast_date"] = pd.to_datetime(df_code["forecast_date"], errors="coerce")
-            df_code = df_code.sort_values(["forecast_date", "target_date"]).reset_index(drop=True)
+            sort_cols = ["forecast_date", "target_date"]
+            if "lookback" in df_code.columns:
+                sort_cols.insert(1, "lookback")
+            if "forecast" in df_code.columns:
+                sort_cols.insert(2, "forecast")
+            df_code = df_code.sort_values(sort_cols).reset_index(drop=True)
         else:
-            df_code = df_code.sort_values("target_date").reset_index(drop=True)
+            sort_cols = ["target_date"]
+            if "lookback" in df_code.columns:
+                sort_cols.insert(0, "lookback")
+            if "forecast" in df_code.columns:
+                sort_cols.insert(1, "forecast")
+            df_code = df_code.sort_values(sort_cols).reset_index(drop=True)
 
         # CI is computed from the last lookback predictions (excluding current point).
         pred_series = pd.to_numeric(df_code["predictions"], errors="coerce")
@@ -607,7 +619,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
 
         codes = np.unique(predictions_df['code'].values)
         dates = np.unique(predictions_df['target_date'].values)
-        forecasts = np.unique(predictions_df['forecast'].values[0])
+        forecasts = np.unique(predictions_df['forecast'].values)
         results_accumulator = []
         for code in codes:
             for date in dates:
@@ -729,7 +741,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             base_dir=predictions_dataset_path, 
             format="parquet", 
             partitioning=write_partitioning,
-            existing_data_behavior="overwrite_or_ignore"
+            existing_data_behavior="delete_matching"
         )
 
         '''df_clean.to_parquet(

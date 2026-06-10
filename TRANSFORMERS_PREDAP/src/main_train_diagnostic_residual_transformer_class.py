@@ -235,8 +235,11 @@ class DiagnosticResidualTransformerPipeline:
             split_ratio = self.config.default_split_ratio,
         )
         
-        # Load base model predictions or use provided corrected predictions
-        if self.config.predictions_train_corrected is None:
+        # Load base model predictions unless a complete corrected train/test pair was provided.
+        if (
+            self.config.predictions_train_corrected is None
+            or self.config.predictions_test_corrected is None
+        ):
             self.predictions_train, self.predictions_test = load_base_model_transformer(
                 X_train = self.X_train, 
                 X_test = self.X_test, 

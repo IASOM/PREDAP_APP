@@ -111,6 +111,39 @@ def _filter_codes_in_dataset(codes: list[str], data_path: Path) -> list[str]:
     return resolved_codes
 
 
+def _temporal_pairs(
+    *,
+    lookback: int,
+    forecast: int,
+    lookbacks: list[int] | None = None,
+    forecasts: list[int] | None = None,
+    default_lookbacks: list[int] | None = None,
+    default_forecasts: list[int] | None = None,
+) -> list[tuple[int, int]]:
+    if lookbacks is None and forecasts is None and default_lookbacks is not None:
+        lookbacks = default_lookbacks
+        forecasts = default_forecasts
+    else:
+        lookbacks = lookbacks or [lookback]
+        forecasts = forecasts or [forecast]
+
+    if forecasts is None:
+        forecasts = [forecast]
+
+    if len(lookbacks) == 1 and len(forecasts) > 1:
+        lookbacks = lookbacks * len(forecasts)
+    elif len(forecasts) == 1 and len(lookbacks) > 1:
+        forecasts = forecasts * len(lookbacks)
+
+    if len(lookbacks) != len(forecasts):
+        raise ValueError(
+            "--lookbacks and --forecasts must have the same length, "
+            "unless one side contains a single value to reuse"
+        )
+
+    return list(zip(lookbacks, forecasts))
+
+
 def _subprocess(command: Iterable[str], cwd: Path) -> int:
     print("+ " + " ".join(str(part) for part in command))
     return subprocess.call(list(command), cwd=str(cwd))
@@ -233,13 +266,15 @@ def _run_one_training(args: argparse.Namespace, code: str, lookback: int, foreca
 def cmd_train(args: argparse.Namespace) -> int:
     codes = args.codes or [args.code]
     codes = _filter_codes_in_dataset(codes, args.data_path)
-    lookbacks = args.lookbacks or [args.lookback]
-    forecasts = args.forecasts or [args.forecast]
-    if len(lookbacks) != len(forecasts):
-        raise ValueError("--lookbacks and --forecasts must have the same length")
+    temporal_pairs = _temporal_pairs(
+        lookback=args.lookback,
+        forecast=args.forecast,
+        lookbacks=args.lookbacks,
+        forecasts=args.forecasts,
+    )
 
     for code in codes:
-        for lookback, forecast in zip(lookbacks, forecasts):
+        for lookback, forecast in temporal_pairs:
             _run_one_training(args, code=code, lookback=lookback, forecast=forecast)
     return 0
 
@@ -252,10 +287,14 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
 
     from production.model_reconstruction_pipeline import ModelPredictionPipeline
     from src.config.base_transformer_config import BaseTransformerConfig
-    lookbacks = args.lookbacks or [7, 14, 60, 60, 182, 182]
-    forecasts = args.forecasts or [7, 14, 30, 60, 182, 365]
-    if len(lookbacks) != len(forecasts):
-        raise ValueError("--lookbacks and --forecasts must have the same length")
+    temporal_pairs = _temporal_pairs(
+        lookback=args.lookback,
+        forecast=args.forecast,
+        lookbacks=args.lookbacks,
+        forecasts=args.forecasts,
+        default_lookbacks=[7, 14, 60, 60, 182, 182],
+        default_forecasts=[7, 14, 30, 60, 182, 365],
+    )
 
     if args.codes:
         codes = args.codes
@@ -315,8 +354,8 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
             input_directory=str(args.data_path),
             old_input_directory=str(args.old_data_path or args.data_path),
             code=code,
-            LOOKBACK_LIST=lookbacks,
-            FORECAST_LIST=forecasts,
+            LOOKBACK_LIST=[lookback for lookback, _ in temporal_pairs],
+            FORECAST_LIST=[forecast for _, forecast in temporal_pairs],
             final_output_predictions=None,
             final_output_df=final_output_df,
             prediction_dates=prediction_dates,
@@ -340,15 +379,17 @@ def cmd_quantize(args: argparse.Namespace) -> int:
     from production.model_quantization_pipeline import ModelQuantizationPipeline
     from src.config.base_transformer_config import BaseTransformerConfig
 
-    lookbacks = args.lookbacks or [args.lookback]
-    forecasts = args.forecasts or [args.forecast]
-    if len(lookbacks) != len(forecasts):
-        raise ValueError("--lookbacks and --forecasts must have the same length")
+    temporal_pairs = _temporal_pairs(
+        lookback=args.lookback,
+        forecast=args.forecast,
+        lookbacks=args.lookbacks,
+        forecasts=args.forecasts,
+    )
 
     pipeline = ModelQuantizationPipeline(config=BaseTransformerConfig())
     scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
     for code in args.codes:
-        for lookback, forecast in zip(lookbacks, forecasts):
+        for lookback, forecast in temporal_pairs:
             models = pipeline.run_quantization_pipeline(
                 exp_names=args.experiments,
                 input_directory=str(args.data_path),
@@ -385,8 +426,8 @@ def add_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--codes", type=_csv_strings, help="Comma-separated list of codes. Overrides --code.")
     parser.add_argument("--lookback", type=int, default=7, help="Single lookback window, in days.")
     parser.add_argument("--forecast", type=int, default=7, help="Single forecast horizon, in days.")
-    parser.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. Must match --forecasts length.")
-    parser.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. Must match --lookbacks length.")
+    parser.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. A single --forecast value is reused when --forecasts is omitted.")
+    parser.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. A single --lookback value is reused when --lookbacks is omitted.")
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Input dataset used for training or reconstruction.")
     parser.add_argument("--model-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Folder containing model outputs or quantized weights.")
     parser.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for training/evaluation.")

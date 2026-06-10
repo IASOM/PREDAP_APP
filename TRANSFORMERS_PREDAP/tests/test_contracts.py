@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import ast
+import sys
 import unittest
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def _read(relative_path: str) -> str:
@@ -64,6 +67,61 @@ class ContractTests(unittest.TestCase):
         )
         self.assertNotIn("output_path = self.config.production_predictions_dir", function_source)
         self.assertIn("final_output_df cannot be None", function_source)
+
+    def test_residual_pipelines_require_complete_prediction_handoff(self) -> None:
+        for relative_path in (
+            "src/main_train_diagnostic_residual_transformer_class.py",
+            "src/main_train_seasonal_residual_transformer_class.py",
+        ):
+            source = _read(relative_path)
+            function = _function_node(source, "prepare_base_model_data")
+            function_source = ast.get_source_segment(source, function) or ""
+
+            self.assertIn("self.config.predictions_train_corrected is None", function_source)
+            self.assertIn("self.config.predictions_test_corrected is None", function_source)
+            self.assertIn("load_base_model_transformer", function_source)
+
+    def test_temporal_pairs_support_scalar_broadcasting(self) -> None:
+        from predap_cli import _temporal_pairs
+
+        self.assertEqual(
+            _temporal_pairs(lookback=7, forecast=7, lookbacks=[7, 14], forecasts=None),
+            [(7, 7), (14, 7)],
+        )
+        self.assertEqual(
+            _temporal_pairs(lookback=7, forecast=7, lookbacks=None, forecasts=[7, 14]),
+            [(7, 7), (7, 14)],
+        )
+        self.assertEqual(
+            _temporal_pairs(lookback=7, forecast=7, lookbacks=[7, 14], forecasts=[7, 14]),
+            [(7, 7), (14, 14)],
+        )
+
+        with self.assertRaises(ValueError):
+            _temporal_pairs(lookback=7, forecast=7, lookbacks=[7, 14], forecasts=[7, 14, 30])
+
+    def test_prediction_output_keeps_temporal_parameter_identity(self) -> None:
+        source = _read("production/model_reconstruction_pipeline.py")
+        function = _function_node(source, "run_reconstruct_save_results_pipeline")
+        function_source = ast.get_source_segment(source, function) or ""
+
+        self.assertIn('auxiliary_output_df["lookback"] = lookback', function_source)
+        self.assertIn('auxiliary_output_df["forecast"] = forecast', function_source)
+        self.assertIn('auxiliary_output_df["forecast_step"] = np.arange(1, forecast + 1)', function_source)
+
+    def test_prediction_writes_replace_matching_partitions(self) -> None:
+        source = _read("production/model_reconstruction_pipeline.py")
+
+        self.assertIn('existing_data_behavior="delete_matching"', source)
+        self.assertNotIn('existing_data_behavior="overwrite_or_ignore"', source)
+
+    def test_prediction_metrics_iterate_all_forecasts(self) -> None:
+        source = _read("production/model_reconstruction_pipeline.py")
+        function = _function_node(source, "compute_evaluation_metrics")
+        function_source = ast.get_source_segment(source, function) or ""
+
+        self.assertIn("np.unique(predictions_df['forecast'].values)", function_source)
+        self.assertNotIn("np.unique(predictions_df['forecast'].values[0])", function_source)
 
 
 if __name__ == "__main__":

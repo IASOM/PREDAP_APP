@@ -862,7 +862,7 @@ def run_full_prediction_pipeline(
     
     # Use identity scaler if none provided
     if scaler is None:
-        scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+        scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     
     # Step 1: Verify data path exists
     print(f"\n[Step 1] Verifying data path: {data_path}")

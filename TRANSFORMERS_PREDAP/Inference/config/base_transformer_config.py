@@ -55,7 +55,7 @@ class BaseTransformerConfig(ABC):
 
     covid_token: bool = True
     evaluate_model: bool = False
-    scaler: FunctionTransformer = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+    scaler: FunctionTransformer = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
 
     plots_dir: str = "plots"
     model_folder: str = "../transformer_outputs/models_covid_token"

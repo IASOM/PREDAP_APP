@@ -30,7 +30,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from config.base_transformer_config import BaseTransformerConfig
 from production.data_preparation_in_poduction import DataPreparationInProduction
 
-scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
 
 
 CUSTOM_OBJECTS_UNIV = {
@@ -365,7 +365,7 @@ if __name__ == "__main__":
 
     input_directory = '../data/FINAL_DB/finals_combined.csv'
     models_directory = '../transformer_outputs/models_covid_token'
-    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     max_date = '2027-09-30'
     cutoff_date = '2008-01-01'
     eliminate_covid_data = False

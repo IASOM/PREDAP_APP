@@ -69,7 +69,7 @@ class BaseTransformerConfig(ABC):
     covid_token: bool = True
     evaluate_model: bool = False
     #scaler = RobustScaler(quantile_range=(15.0, 85.0))
-    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     #scaler = MinMaxScaler( feature_range=(0, 1))
     #scaler = PowerTransformer()
     #scaler = QuantileTransformer()

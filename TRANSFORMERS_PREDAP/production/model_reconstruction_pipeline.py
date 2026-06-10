@@ -139,7 +139,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
                 return matches[0]
 
         raise FileNotFoundError(
-            f"Weights file not found for code='{code}', model_type='{model_type}', "
+                    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
             f"forecast={forecast}, lookback={lookback}. Tried: {weights_path}"
         )
 
@@ -278,7 +278,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             final_output_predictions: Optional[np.ndarray], 
             final_output_df: pd.DataFrame,
             prediction_dates: Optional[List[str]] = None,
-            
+                scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
             ) -> pd.DataFrame:
         """Runs the full pipeline to reconstruct the model, make predictions, and save results for a given code and list of lookback and forecast combinations. 
         Args:
@@ -778,7 +778,7 @@ if __name__ == "__main__":
     #model_folder = '../transformer_outputs/models_covid_token'
     output_path = f"../production_predictions/final_output_predictions"
     metrics_df_path = "../production_predictions/production_evaluation_metrics.parquet"
-    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     max_date = '2027-09-30'
     cutoff_date = '2008-01-01'
     eliminate_covid_data = False

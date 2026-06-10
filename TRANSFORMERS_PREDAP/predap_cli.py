@@ -13,7 +13,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parent
 SRC_ROOT = REPO_ROOT / "src"
 AQUAS_ROOT = REPO_ROOT / "AQUAS_DATA_RETRIEVAL" / "AQUAS_DATA_RETRIEVAL-main"
-DEFAULT_DATA_PATH = AQUAS_ROOT / "data" / "sample" / "multiyear_output" / "finals" / "demand_diagnosis_joined.parquet"
+DEFAULT_DATA_PATH = AQUAS_ROOT / "data" / "finals" / "demand_diagnosis_joined.parquet"
 
 
 class PredapHelpFormatter(
@@ -348,7 +348,7 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
         config = BaseTransformerConfig(
             **config_kwargs,
         )
-        config.scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+        config.scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
         pipeline = ModelPredictionPipeline(config=config)
         final_output_df = pipeline.run_reconstruct_save_results_pipeline(
             input_directory=str(args.data_path),
@@ -387,7 +387,7 @@ def cmd_quantize(args: argparse.Namespace) -> int:
     )
 
     pipeline = ModelQuantizationPipeline(config=BaseTransformerConfig())
-    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x)
+    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     for code in args.codes:
         for lookback, forecast in temporal_pairs:
             models = pipeline.run_quantization_pipeline(

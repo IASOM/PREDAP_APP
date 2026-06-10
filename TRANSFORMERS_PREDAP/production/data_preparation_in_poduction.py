@@ -359,10 +359,10 @@ class DataPreparationInProduction:
         print("Preparing seasonal features for training data...")
         df_processed = data_preparation.prepare_time_series_features(
             df, 
-            self.config.DEFAULT_SEASONAL_CATEGORICAL_VARS, 
-            cutoff_date=self.config.cutoff_date,
+            categorical_vars, 
+            cutoff_date=cutoff_date,
             max_date = max_date,
-            scaler = self.config.scaler,
+            scaler = scaler,
             eliminate_covid_data=self.config.eliminate_covid_data, 
             covid_dates=self.config.covid_dates,)
 

@@ -28,7 +28,7 @@ import time
 import numpy as np
 
 
-MAX_DATE = '2027-09-30'
+MAX_DATE = '2025-12-31'
 
 def generate_rolling_sequences(X_raw, Y_raw, lookback, forecast):
     # Generate rolling sequences

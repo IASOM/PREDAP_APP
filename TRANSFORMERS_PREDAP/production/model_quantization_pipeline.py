@@ -366,7 +366,7 @@ if __name__ == "__main__":
     input_directory = '../data/FINAL_DB/finals_combined.csv'
     models_directory = '../transformer_outputs/models_covid_token'
     scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
-    max_date = '2027-09-30'
+    max_date = '2025-12-31'
     cutoff_date = '2008-01-01'
     eliminate_covid_data = False
     covid_dates = None

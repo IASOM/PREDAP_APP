@@ -21,7 +21,7 @@ from src.data_utils.sequences import generate_rolling_sequences_covariates, shif
 from pathlib import Path
 
 
-MAX_DATE = '2027-09-30'
+MAX_DATE = '2025-12-31'
 
 
 def cut_dataframe(df: pd.DataFrame, date_cutoff: str = "2010-01-01", max_date: str = MAX_DATE, csv_file: str = None, save_data: bool = False) -> pd.DataFrame:

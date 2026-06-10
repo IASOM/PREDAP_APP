@@ -72,7 +72,7 @@ if __name__ == "__main__":
     output_path = f"../production_predictions/final_output_predictions"
     metrics_df_path = "../production_predictions/production_evaluation_metrics.parquet"
     scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
-    max_date = '2027-09-30'
+    max_date = '2025-12-31'
     cutoff_date = '2008-01-01'
     eliminate_covid_data = False
     covid_dates = None
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         input_directory = f"AQUAS_DATA_RETRIEVAL/data/sample/multilayer_output/finals/demand_diagnosis_joined.parquet"
         str_date = date.strftime("%Y-%m-%d")
         custom_args = [
-        "--start", "2010-01-01",
+        "--start", "2008-01-01",
         "--end", str_date,
         "--input-dir", input_dir,
         "--output-dir", out_dir

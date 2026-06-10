@@ -1,7 +1,7 @@
 from typing import Tuple, Optional
 import pandas as pd
 
-MAX_DATE = '2027-09-30'
+MAX_DATE = '2025-12-31'
 
 def split_train_test(df: pd.DataFrame,
                      split_ratio: float = 0.8,

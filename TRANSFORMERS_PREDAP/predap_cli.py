@@ -204,6 +204,8 @@ def _common_config_kwargs(args: argparse.Namespace) -> dict:
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "activation_function": args.activation_function,
+        "final_cutoff_date": args.max_date,
+        "max_date": args.max_date,
     }
 
 
@@ -341,6 +343,8 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
             "learning_rate": args.learning_rate,
             "epochs": args.epochs,
             "batch_size": args.batch_size,
+            "max_date": args.max_date,
+            "final_cutoff_date": args.max_date,
         }
         if args.diagnostic_covariates_prefix:
             config_kwargs["diagnostic_covariates_path"] = args.diagnostic_covariates_prefix
@@ -431,6 +435,7 @@ def add_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Input dataset used for training or reconstruction.")
     parser.add_argument("--model-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Folder containing model outputs or quantized weights.")
     parser.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for training/evaluation.")
+    parser.add_argument("--max-date", default="2025-12-31", help="Last date kept for training/evaluation.")
     parser.add_argument("--covid-token", action=argparse.BooleanOptionalAction, default=True, help="Enable or disable the COVID indicator feature.")
     parser.add_argument("--positional-encoding", action=argparse.BooleanOptionalAction, default=True, help="Enable or disable positional encoding in transformer models.")
     parser.add_argument("--evaluate-model", action=argparse.BooleanOptionalAction, default=True, help="Run model evaluation when the pipeline supports it.")
@@ -500,8 +505,8 @@ Arguments after "--" are passed unchanged to AQUAS.
   python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
 """,
     )
-    sample.add_argument("--start", default="2010-01-01", help="First date to generate, formatted YYYY-MM-DD.")
-    sample.add_argument("--end", default="2023-10-31", help="Last date to generate, formatted YYYY-MM-DD.")
+    sample.add_argument("--start", default="2008-01-01", help="First date to generate, formatted YYYY-MM-DD.")
+    sample.add_argument("--end", default="2025-12-31", help="Last date to generate, formatted YYYY-MM-DD.")
     sample.add_argument("--input-dir", type=Path, default=AQUAS_ROOT / "data" / "sample" / "multiyear_input", help="Temporary sample input directory.")
     sample.add_argument("--output-dir", type=Path, default=AQUAS_ROOT / "data" / "sample" / "multiyear_output", help="Directory where generated sample outputs are written.")
     sample.set_defaults(func=cmd_sample_data)
@@ -576,7 +581,7 @@ Examples:
     quantize.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. Must match --forecasts length.")
     quantize.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. Must match --lookbacks length.")
     quantize.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for quantization evaluation.")
-    quantize.add_argument("--max-date", default="2027-09-30", help="Last date kept for quantization evaluation.")
+    quantize.add_argument("--max-date", default="2025-12-31", help="Last date kept for quantization evaluation.")
     quantize.add_argument("--eliminate-covid-data", action=argparse.BooleanOptionalAction, default=False, help="Exclude COVID-period rows during quantization evaluation.")
     quantize.add_argument("--evaluate", action=argparse.BooleanOptionalAction, default=False, help="Evaluate original versus quantized model outputs.")
     quantize.set_defaults(func=cmd_quantize)

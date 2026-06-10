@@ -66,7 +66,7 @@ def cut_dataframe(
     return df
 
 
-def prepare_time_series_features(df: pd.DataFrame, categorical_vars, cutoff_date = '2010-01-01', max_date = '2027-09-30', scaler = None, eliminate_covid_data=False, covid_dates=None):
+def prepare_time_series_features(df: pd.DataFrame, categorical_vars, cutoff_date = '2010-01-01', max_date = '2025-12-31', scaler = None, eliminate_covid_data=False, covid_dates=None):
     df = df.copy()
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
     if eliminate_covid_data:

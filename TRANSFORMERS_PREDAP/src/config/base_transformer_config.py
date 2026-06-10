@@ -53,7 +53,7 @@ class BaseTransformerConfig(ABC):
     production_metrics_file: str = "../production_predictions/production_evaluation_metrics.parquet"
     
     cutoff_date: str = "2008-01-01"
-    max_date: str = "2027-09-30"#"2021-06-30"#
+    max_date: str = "2025-12-31"#"2021-06-30"#
     final_cutoff_date: Optional[str] = None
     positional_encoding: bool = True
     default_split_ratio: float = 0.8

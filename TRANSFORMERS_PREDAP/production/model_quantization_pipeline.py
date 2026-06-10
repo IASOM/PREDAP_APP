@@ -116,6 +116,86 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         
         return model
 
+    def _local_model_code_candidates(self, code: str) -> list[str]:
+        original = str(code).strip()
+        canonical = self._canonicalize_code(original)
+        candidates = [original]
+        if original.upper().startswith("DEMAND_"):
+            candidates.append(original.upper()[len("DEMAND_"):])
+        if canonical not in candidates:
+            candidates.append(canonical)
+        if canonical.startswith("DEMANDA_"):
+            stripped = canonical[len("DEMANDA_"):]
+            if stripped not in candidates:
+                candidates.append(stripped)
+        return [candidate for candidate in dict.fromkeys(candidates) if candidate]
+
+    def load_local_model(
+        self,
+        trained_model_folder,
+        code,
+        model_type,
+        lookback,
+        forecast,
+        custom_objects=None,
+    ):
+        """Load a locally saved Keras model from a trained model folder structure.
+
+        Args:
+            trained_model_folder (str or Path): Top-level folder containing model outputs by code.
+            code (str): The requested code name.
+            model_type (str): Subdirectory name for the model type, e.g. 'univariate_model'.
+            lookback (int): Lookback horizon used to identify the model file.
+            forecast (int): Forecast horizon used to identify the model file.
+            custom_objects (dict, optional): Custom objects required to load the model.
+
+        Returns:
+            keras.Model: The loaded Keras model.
+        """
+        trained_model_folder = Path(trained_model_folder)
+        if not trained_model_folder.exists():
+            raise ValueError(
+                f"Local trained model folder not found: {trained_model_folder}"
+            )
+
+        candidates = self._local_model_code_candidates(code)
+        model_dirs = []
+        for candidate_code in candidates:
+            candidate_dir = trained_model_folder / candidate_code / model_type
+            if candidate_dir.exists():
+                model_dirs.append(candidate_dir)
+
+        if not model_dirs:
+            raise ValueError(
+                f"Could not find a local '{model_type}' directory for code '{code}' in {trained_model_folder}."
+                f" Tried codes: {candidates}."
+            )
+
+        search_pattern = re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE)
+        for model_dir in model_dirs:
+            candidates = [
+                path
+                for path in model_dir.iterdir()
+                if path.is_file() and path.suffix.lower() == ".keras"
+            ]
+            exact_matches = [path for path in candidates if search_pattern.match(path.name)]
+            if exact_matches:
+                exact_matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+                selected = exact_matches[0]
+                print(f"✓ Found local model: {selected}")
+                with tf.keras.utils.custom_object_scope(custom_objects or {}):
+                    return tf.keras.models.load_model(str(selected), compile=False, safe_mode=False)
+            if candidates:
+                print(
+                    f"-> WARNING: No exact {forecast}fh/{lookback}lb match in {model_dir}. "
+                    f"Available files: {[p.name for p in candidates]}"
+                )
+
+        raise ValueError(
+            f"No local model file found for code='{code}', lookback={lookback}, forecast={forecast} "
+            f"in directories: {[str(d) for d in model_dirs]}"
+        )
+
     def manual_weight_quantization(self, model, model_name,  output_path="_f16.keras"):
         """Manually quantize the weights of a Keras model to float16 precision.
         Args:
@@ -180,7 +260,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         return original_mae, original_mse, original_rmse, original_wape, corrected_preds
 
 
-    def save_quantized_model_weights(self, quant_model, model_name, code, forecast, lookback):
+    def save_quantized_model_weights(self, quant_model, model_name, code, forecast, lookback, quantized_weights_folder=None):
         """Save the weights of the quantized model to a specified directory with a structured naming convention.
         Args:
             quant_model (keras.Model): The quantized Keras model whose weights are to be saved.
@@ -188,14 +268,15 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             code (str): The code identifier for the dataset/model, used in the naming convention.
             forecast (int): The forecast horizon, used in the naming convention.
             lookback (int): The lookback period, used in the naming convention.
+            quantized_weights_folder (str or Path, optional): Base output folder for quantized weights.
         Returns:
-            None: The function saves the weights to disk and does not return any value."""
-        # Quantized models saved relative to project root
-        save_weights_path = f"quantized_models/{code}/{model_name}/{code}_{model_name}_{forecast}fh_{lookback}lb_f16_weights.h5"
-        if not os.path.exists(os.path.dirname(save_weights_path)):
-            os.makedirs(os.path.dirname(save_weights_path))
-        quant_model.save_weights(save_weights_path)
+            str: The full path where the weights were saved."""
+        base_folder = Path(quantized_weights_folder or "quantized_models")
+        save_weights_path = base_folder / code / model_name / f"{code}_{model_name}_{forecast}fh_{lookback}lb_f16_weights.h5"
+        save_weights_path.parent.mkdir(parents=True, exist_ok=True)
+        quant_model.save_weights(str(save_weights_path))
         print(f"✓ Quantized weights saved to {save_weights_path}")
+        return str(save_weights_path)
 
     def load_mlflow_run_id_by_name(self, exp_names, code, forecast, lookback, model_type, lr=1e-5):
         """Load the mlflow run ID for a given model configuration based on a structured naming convention.
@@ -401,7 +482,21 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"Original WAPE: {seasonal_wape:.4f}%, Quantized WAPE: {original_quant_wape:.4f}%")
         print("================================================================\n")
     
-    def run_quantization_pipeline(self, exp_names, input_directory, code, lookback, forecast, cutoff_date, max_date, scaler, eliminate_covid_data=False, covid_dates=None):
+    def run_quantization_pipeline(
+        self,
+        exp_names,
+        input_directory,
+        code,
+        lookback,
+        forecast,
+        cutoff_date,
+        max_date,
+        scaler,
+        eliminate_covid_data=False,
+        covid_dates=None,
+        trained_model_folder=None,
+        quantized_weights_folder=None,
+    ):
         """Run the full model quantization pipeline: load models, quantize weights, save quantized weights, and evaluate performance impact.
         
         Args:
@@ -415,6 +510,8 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             scaler (object): The scaler object used for data normalization.
             eliminate_covid_data (bool, optional): Whether to eliminate COVID-19 data. Default is False.
             covid_dates (list of str, optional): COVID-19 periods to eliminate. Default is None.
+            trained_model_folder (str or Path, optional): Optional local trained model folder for loading models without MLflow.
+            quantized_weights_folder (str or Path, optional): Base folder for saving quantized weights.
             
         Returns:
             tuple: (univ_model, diagnostics_model, seasonal_model, quant_univ_model, quant_diagnostics_model, quant_seasonal_model)
@@ -426,20 +523,31 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"\n{'='*70}")
         print(f"QUANTIZATION PIPELINE - Loading Models")
         print(f"{'='*70}")
-        
-        run_id = self.load_mlflow_run_id_by_name(
-            exp_names=exp_names,
-            code=code,
-            forecast=forecast,
-            lookback=lookback,
-            model_type=None,
-            lr=1e-5
-        )
-        
-        print(f"\n📥 Loading quantized models from run {run_id}...")
-        univ_model = self.load_mlflow_model(run_id, univ_model_name_in_run, custom_objects=CUSTOM_OBJECTS_UNIV)
-        diagnostics_model = self.load_mlflow_model(run_id, diag_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
-        seasonal_model = self.load_mlflow_model(run_id, seasonal_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+
+        if exp_names:
+            run_id = self.load_mlflow_run_id_by_name(
+                exp_names=exp_names,
+                code=code,
+                forecast=forecast,
+                lookback=lookback,
+                model_type=None,
+                lr=1e-5,
+            )
+            print(f"\n📥 Loading models from MLflow run {run_id}...")
+            univ_model = self.load_mlflow_model(run_id, univ_model_name_in_run, custom_objects=CUSTOM_OBJECTS_UNIV)
+            diagnostics_model = self.load_mlflow_model(run_id, diag_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+            seasonal_model = self.load_mlflow_model(run_id, seasonal_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+        elif trained_model_folder:
+            print(f"\n📥 Loading local models from folder {trained_model_folder}...")
+            univ_model = self.load_local_model(trained_model_folder, code, "univariate_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_UNIV)
+            diagnostics_model = self.load_local_model(trained_model_folder, code, "diagnostics_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+            seasonal_model = self.load_local_model(trained_model_folder, code, "seasonal_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
+        else:
+            raise ValueError(
+                "Either --experiments or --trained-model-folder must be provided for quantization. "
+                "Use MLflow experiments or local model folder input."
+            )
+
         print(f"✓ Models loaded successfully")
         
         print(f"\n⚙️  Quantizing model weights...")
@@ -449,9 +557,30 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"✓ Quantization complete")
         
         print(f"\n💾 Saving quantized weights...")
-        self.save_quantized_model_weights(quant_univ_model, "univariate_model", code, forecast, lookback)
-        self.save_quantized_model_weights(quant_diagnostics_model, "diagnostics_model", code, forecast, lookback)
-        self.save_quantized_model_weights(quant_seasonal_model, "seasonal_model", code, forecast, lookback)
+        self.save_quantized_model_weights(
+            quant_univ_model,
+            "univariate_model",
+            code,
+            forecast,
+            lookback,
+            quantized_weights_folder=quantized_weights_folder,
+        )
+        self.save_quantized_model_weights(
+            quant_diagnostics_model,
+            "diagnostics_model",
+            code,
+            forecast,
+            lookback,
+            quantized_weights_folder=quantized_weights_folder,
+        )
+        self.save_quantized_model_weights(
+            quant_seasonal_model,
+            "seasonal_model",
+            code,
+            forecast,
+            lookback,
+            quantized_weights_folder=quantized_weights_folder,
+        )
         print(f"✓ Weights saved successfully")
         
         print(f"\n{'='*70}\n")

@@ -407,6 +407,8 @@ def cmd_quantize(args: argparse.Namespace) -> int:
                 scaler=scaler,
                 eliminate_covid_data=args.eliminate_covid_data,
                 covid_dates=None,
+                trained_model_folder=str(args.trained_model_folder),
+                quantized_weights_folder=str(args.quantized_weights_folder),
             )
             if args.evaluate:
                 pipeline.eval_quantization_impact(
@@ -574,13 +576,16 @@ Examples:
     quantize = subparsers.add_parser(
         "quantize",
         formatter_class=PredapHelpFormatter,
-        help="Quantize MLflow models into production weight files.",
-        description="Load trained MLflow models and save float16 production weights.",
-        epilog="""Example:
+        help="Quantize MLflow or local models into production weight files.",
+        description="Load trained MLflow runs or local model outputs and save float16 production weights.",
+        epilog="""Examples:
+  python predap_cli.py quantize --trained-model-folder ../transformer_outputs/models_covid_token --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
   python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
 """,
     )
-    quantize.add_argument("--experiments", type=_csv_strings, required=True, help="Comma-separated MLflow experiment names to search.")
+    quantize.add_argument("--experiments", type=_csv_strings, help="Comma-separated MLflow experiment names to search. If omitted, local models are loaded from --trained-model-folder.")
+    quantize.add_argument("--trained-model-folder", type=Path, default=REPO_ROOT.parent / "transformer_outputs" / "models_covid_token", help="Local base folder containing trained model outputs organized by code.")
+    quantize.add_argument("--quantized-weights-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Directory where quantized weight files are written.")
     quantize.add_argument("--codes", type=_csv_strings, required=True, help="Comma-separated codes to quantize.")
     quantize.add_argument("--data-path", type=Path, default=REPO_ROOT.parent / "data" / "FINAL_DB" / "finals_combined.csv", help="Input dataset used for quantization checks.")
     quantize.add_argument("--lookback", type=int, default=7, help="Single lookback window, in days.")

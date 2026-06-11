@@ -409,6 +409,7 @@ def cmd_quantize(args: argparse.Namespace) -> int:
                 covid_dates=None,
                 trained_model_folder=str(args.trained_model_folder),
                 quantized_weights_folder=str(args.quantized_weights_folder),
+                model_path=str(args.model_path) if getattr(args, 'model_path', None) is not None else None,
             )
             if args.evaluate:
                 pipeline.eval_quantization_impact(
@@ -585,6 +586,7 @@ Examples:
     )
     quantize.add_argument("--experiments", type=_csv_strings, help="Comma-separated MLflow experiment names to search. If omitted, local models are loaded from --trained-model-folder.")
     quantize.add_argument("--trained-model-folder", type=Path, default=REPO_ROOT.parent / "transformer_outputs" / "models_covid_token", help="Local base folder containing trained model outputs organized by code.")
+    quantize.add_argument("--model-path", type=Path, help="Direct path to a model file (.keras) or a code folder containing model subfolders to quantize.")
     quantize.add_argument("--quantized-weights-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Directory where quantized weight files are written.")
     quantize.add_argument("--codes", type=_csv_strings, required=True, help="Comma-separated codes to quantize.")
     quantize.add_argument("--data-path", type=Path, default=REPO_ROOT.parent / "data" / "FINAL_DB" / "finals_combined.csv", help="Input dataset used for quantization checks.")

@@ -496,6 +496,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         covid_dates=None,
         trained_model_folder=None,
         quantized_weights_folder=None,
+        model_path=None,
     ):
         """Run the full model quantization pipeline: load models, quantize weights, save quantized weights, and evaluate performance impact.
         
@@ -524,7 +525,125 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"QUANTIZATION PIPELINE - Loading Models")
         print(f"{'='*70}")
 
-        if exp_names:
+        # Priority: explicit model_path -> MLflow experiments -> trained_model_folder
+        if model_path:
+            model_path = Path(model_path)
+            # If user gave a single model file, quantize that file
+            if model_path.is_file():
+                print(f"\n📥 Loading local model file: {model_path}...")
+                name_lower = model_path.name.lower()
+                if "univ" in name_lower or "base_transformer" in name_lower:
+                    model_type = "univariate_model"
+                    custom_objs = CUSTOM_OBJECTS_UNIV
+                elif "diagnostic" in name_lower or "diagnostics" in name_lower:
+                    model_type = "diagnostics_model"
+                    custom_objs = CUSTOM_OBJECTS_RESIDUAL
+                elif "seasonal" in name_lower:
+                    model_type = "seasonal_model"
+                    custom_objs = CUSTOM_OBJECTS_RESIDUAL
+                else:
+                    model_type = None
+                    custom_objs = CUSTOM_OBJECTS_UNIV
+
+                with tf.keras.utils.custom_object_scope(custom_objs or {}):
+                    loaded = tf.keras.models.load_model(str(model_path), compile=False, safe_mode=False)
+
+                # Try to infer code from parent folders, fallback to provided code
+                inferred_code = code
+                for parent in model_path.parents:
+                    candidate = parent.name
+                    if self._canonicalize_code(candidate) == self._canonicalize_code(code):
+                        inferred_code = candidate
+                        break
+
+                # Prepare returned tuple depending on model_type
+                if model_type == "univariate_model":
+                    univ_model = loaded
+                    diagnostics_model = None
+                    seasonal_model = None
+                    quant_univ_model = self.manual_weight_quantization(univ_model, model_name=model_path.stem)
+                    self.save_quantized_model_weights(quant_univ_model, model_path.stem, inferred_code, forecast, lookback, quantized_weights_folder)
+                    return univ_model, diagnostics_model, seasonal_model, quant_univ_model, None, None
+
+                if model_type == "diagnostics_model":
+                    diagnostics_model = loaded
+                    univ_model = None
+                    seasonal_model = None
+                    quant_diag = self.manual_weight_quantization(diagnostics_model, model_name=model_path.stem)
+                    self.save_quantized_model_weights(quant_diag, model_path.stem, inferred_code, forecast, lookback, quantized_weights_folder)
+                    return univ_model, diagnostics_model, seasonal_model, None, quant_diag, None
+
+                if model_type == "seasonal_model":
+                    seasonal_model = loaded
+                    univ_model = None
+                    diagnostics_model = None
+                    quant_seas = self.manual_weight_quantization(seasonal_model, model_name=model_path.stem)
+                    self.save_quantized_model_weights(quant_seas, model_path.stem, inferred_code, forecast, lookback, quantized_weights_folder)
+                    return univ_model, diagnostics_model, seasonal_model, None, None, quant_seas
+
+                # Unknown type: quantize and save using generic name
+                generic_quant = self.manual_weight_quantization(loaded, model_name=model_path.stem)
+                self.save_quantized_model_weights(generic_quant, model_path.stem, inferred_code, forecast, lookback, quantized_weights_folder)
+                return loaded, None, None, generic_quant, None, None
+
+            # If directory provided, treat it as a code folder that may contain model subfolders
+            if model_path.is_dir():
+                code_dir = model_path
+                print(f"\n📥 Loading local models from code folder: {code_dir}...")
+                univ_model = diagnostics_model = seasonal_model = None
+                quant_univ_model = quant_diag = quant_seas = None
+
+                # Look for subfolders
+                def load_best_from_subdir(subdir_name, custom_objs):
+                    subdir = code_dir / subdir_name
+                    if not subdir.exists():
+                        return None
+                    pattern = re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE)
+                    candidates = [p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".keras"]
+                    exact = [p for p in candidates if pattern.match(p.name)]
+                    pick = None
+                    if exact:
+                        exact.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        pick = exact[0]
+                    elif candidates:
+                        candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        pick = candidates[0]
+                    if pick:
+                        print(f"  - Loading {pick}")
+                        with tf.keras.utils.custom_object_scope(custom_objs or {}):
+                            return tf.keras.models.load_model(str(pick), compile=False, safe_mode=False)
+                    return None
+
+                univ_model = load_best_from_subdir("univariate_model", CUSTOM_OBJECTS_UNIV)
+                diagnostics_model = load_best_from_subdir("diagnostics_model", CUSTOM_OBJECTS_RESIDUAL)
+                seasonal_model = load_best_from_subdir("seasonal_model", CUSTOM_OBJECTS_RESIDUAL)
+
+                if univ_model is None and diagnostics_model is None and seasonal_model is None:
+                    # Fallback: look for any .keras files directly under given directory
+                    keras_files = [p for p in code_dir.rglob("*.keras") if p.is_file()]
+                    for p in keras_files:
+                        name_lower = p.name.lower()
+                        if "univ" in name_lower or "base_transformer" in name_lower:
+                            univ_model = tf.keras.models.load_model(str(p), compile=False, safe_mode=False)
+                        elif "diagnostic" in name_lower or "diagnostics" in name_lower:
+                            diagnostics_model = tf.keras.models.load_model(str(p), compile=False, safe_mode=False)
+                        elif "seasonal" in name_lower:
+                            seasonal_model = tf.keras.models.load_model(str(p), compile=False, safe_mode=False)
+
+                # Quantize any loaded models and save
+                if univ_model is not None:
+                    quant_univ_model = self.manual_weight_quantization(univ_model, model_name="univariate_model")
+                    self.save_quantized_model_weights(quant_univ_model, "univariate_model", code, forecast, lookback, quantized_weights_folder)
+                if diagnostics_model is not None:
+                    quant_diag = self.manual_weight_quantization(diagnostics_model, model_name="diagnostics_model")
+                    self.save_quantized_model_weights(quant_diag, "diagnostics_model", code, forecast, lookback, quantized_weights_folder)
+                if seasonal_model is not None:
+                    quant_seas = self.manual_weight_quantization(seasonal_model, model_name="seasonal_model")
+                    self.save_quantized_model_weights(quant_seas, "seasonal_model", code, forecast, lookback, quantized_weights_folder)
+
+                return univ_model, diagnostics_model, seasonal_model, quant_univ_model, diagnostics_model and quant_diag or None, seasonal_model and quant_seas or None
+
+        elif exp_names:
             run_id = self.load_mlflow_run_id_by_name(
                 exp_names=exp_names,
                 code=code,
@@ -544,8 +663,8 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             seasonal_model = self.load_local_model(trained_model_folder, code, "seasonal_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
         else:
             raise ValueError(
-                "Either --experiments or --trained-model-folder must be provided for quantization. "
-                "Use MLflow experiments or local model folder input."
+                "Either --experiments, --trained-model-folder or --model-path must be provided for quantization. "
+                "Use MLflow experiments, a local model folder, or pass a direct model path."
             )
 
         print(f"✓ Models loaded successfully")

@@ -385,6 +385,30 @@ def cmd_quantize(args: argparse.Namespace) -> int:
     from production.model_quantization_pipeline import ModelQuantizationPipeline
     from src.config.base_transformer_config import BaseTransformerConfig
 
+    pipeline = ModelQuantizationPipeline(config=BaseTransformerConfig())
+    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
+
+    # If the user provided a direct model path, skip temporal pairing and quantize directly.
+    if getattr(args, 'model_path', None):
+        for code in args.codes:
+            models = pipeline.run_quantization_pipeline(
+                exp_names=args.experiments,
+                input_directory=str(args.data_path),
+                code=code,
+                lookback=None,
+                forecast=None,
+                cutoff_date=args.cutoff_date,
+                max_date=args.max_date,
+                scaler=scaler,
+                eliminate_covid_data=args.eliminate_covid_data,
+                covid_dates=None,
+                trained_model_folder=str(args.trained_model_folder),
+                quantized_weights_folder=str(args.quantized_weights_folder),
+                model_path=str(args.model_path),
+            )
+            # Skip evaluation when lookback/forecast not provided
+        return 0
+
     temporal_pairs = _temporal_pairs(
         lookback=args.lookback,
         forecast=args.forecast,
@@ -392,8 +416,6 @@ def cmd_quantize(args: argparse.Namespace) -> int:
         forecasts=args.forecasts,
     )
 
-    pipeline = ModelQuantizationPipeline(config=BaseTransformerConfig())
-    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
     for code in args.codes:
         for lookback, forecast in temporal_pairs:
             models = pipeline.run_quantization_pipeline(
@@ -409,7 +431,7 @@ def cmd_quantize(args: argparse.Namespace) -> int:
                 covid_dates=None,
                 trained_model_folder=str(args.trained_model_folder),
                 quantized_weights_folder=str(args.quantized_weights_folder),
-                model_path=str(args.model_path) if getattr(args, 'model_path', None) is not None else None,
+                model_path=None,
             )
             if args.evaluate:
                 pipeline.eval_quantization_impact(

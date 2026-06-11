@@ -246,22 +246,37 @@ python predap_cli.py train \
 
 ## 3. Quantitzar models
 
-La quantitzacio carrega models des de MLflow i guarda pesos `float16` en una estructura apta per produccio.
+La quantització converteix pesos a `float16` i guarda arxius aptes per reconstrucció en producció. Pots carregar models des de MLflow o des d'una carpeta local.
+
+Exemples ràpids:
 
 ```bash
+# Quantitzar des d'un experiment MLflow
 python predap_cli.py quantize \
-  --experiments 1.0_Production_TRANSFORMER_TRANSFORMERS_PREDAP_HYDRA_GRID_SEARCH_20260514 \
-  --codes demanda__SERVEI_CODI__INF,demanda__SERVEI_CODI__MF \
-  --lookbacks 7,14,60,60,182,182 \
-  --forecasts 7,14,30,60,182,365 \
-  --data-path ../data/FINAL_DB/finals_combined.csv
+  --experiments EXP_NAME \
+  --codes DEMAND_DEMANDA_TOTAL \
+  --lookbacks 7,14 --forecasts 7,14
+
+# Quantitzar des d'una carpeta local (per lots)
+python predap_cli.py quantize \
+  --trained-model-folder ../transformer_outputs/models_covid_token \
+  --codes DEMAND_DEMANDA_TOTAL \
+  --lookbacks 7,14 --forecasts 7,14
+
+# Quantitzar directament un fitxer .keras o una carpeta de codi (no cal --lookback/--forecast)
+python predap_cli.py quantize --codes TOTAL --model-path ../transformer_outputs/models_covid_token/DEMANDA_DEMANDA_TOTAL
 ```
 
-Els pesos es guarden sota:
+On es guarden els pesos
 
 ```text
 ../quantized_models/<code>/<model_type>/<code>_<model_type>_<forecast>fh_<lookback>lb_f16_weights.h5
 ```
+
+Notes curtes:
+- `--model-path` accepta un fitxer `.keras` o una carpeta de codi; si és carpeta, busca subcarpetes `univariate_model`, `diagnostics_model`, `seasonal_model` i quantitza els arxius trobats.
+- Quan s'usa `--model-path`, el CLI ignora `--lookbacks` i `--forecasts` i fa una execució per codi.
+- El nom `TOTAL` es canonicalitza automàticament a `DEMANDA_TOTAL` perquè trobi les carpetes locals.
 
 ## 4. Reconstruir i predir en produccio
 

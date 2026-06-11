@@ -105,6 +105,22 @@ python predap_cli.py quantize --trained-model-folder ../transformer_outputs/mode
 
 Això permet fer quantització local després d'un entrenament sense dependre d'un servidor MLflow.
 
+Tip ràpid — quantitza un model directe pel seu camí
+
+Si vols quantitzar un model específic sense haver d'especificar `--lookback` ni `--forecast`, passa `--model-path` amb la ruta al fitxer `.keras` o la carpeta de codi que conté `univariate_model/`, `diagnostics_model/` o `seasonal_model/`:
+
+```bash
+# Quantitza un fitxer .keras concret
+python predap_cli.py quantize --codes TOTAL --model-path ../transformer_outputs/models_covid_token/DEMANDA_DEMANDA_TOTAL/univariate_model/model_univ_7fh_7lb.keras
+
+# Quantitza tots els models dins la carpeta d'un codi (busca subcarpetes i arxius .keras)
+python predap_cli.py quantize --codes DEMAND_DEMANDA_TOTAL --model-path ../transformer_outputs/models_covid_token/DEMANDA_DEMANDA_TOTAL
+```
+
+Notes:
+- Si passes `--model-path` el CLI s'executa una sola vegada per codi i ignora els paràmetres `--lookbacks/--forecasts`.
+- Pots continuar fent servir `--experiments` (MLflow) o `--trained-model-folder` per fluxos per lots.
+
 ## Exemples bàsics
 
 Executar AQUAS en mode sample:

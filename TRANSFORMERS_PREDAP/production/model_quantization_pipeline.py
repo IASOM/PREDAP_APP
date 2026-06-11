@@ -598,9 +598,16 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
                     subdir = code_dir / subdir_name
                     if not subdir.exists():
                         return None
-                    pattern = re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE)
+                    # Build a relaxed pattern only if forecast/lookback provided
+                    pattern = None
+                    if forecast and lookback:
+                        pattern = re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE)
+                    elif forecast:
+                        pattern = re.compile(rf".*{forecast}fh.*\.keras$", re.IGNORECASE)
+                    elif lookback:
+                        pattern = re.compile(rf".*{lookback}lb.*\.keras$", re.IGNORECASE)
                     candidates = [p for p in subdir.iterdir() if p.is_file() and p.suffix.lower() == ".keras"]
-                    exact = [p for p in candidates if pattern.match(p.name)]
+                    exact = [p for p in candidates if pattern and pattern.match(p.name)]
                     pick = None
                     if exact:
                         exact.sort(key=lambda p: p.stat().st_mtime, reverse=True)

@@ -292,20 +292,21 @@ class SeasonalResidualTransformerPipeline:
         
         print("Building residual correction model...")
         
-        # Define transformer parameters
-        '''transformer_params = {
+        transformer_params = {
             'head_size': self.config.head_size,
             'num_heads': self.config.num_heads,
             'ff_dim': self.config.ff_dim,
-            'dropout': self.config.dropout
-        }'''
+            'mlp_units': self.config.mlp_units,
+            'num_transformer_blocks': self.config.num_transformer_blocks,
+            'dropout': self.config.dropout,
+        }
         
         # Build the residual model
         self.residual_model = hybrid_lstm_transformer_model(
             input_shape=(self.config.forecast, self.X_train_covs.shape[2]), 
             forecast=self.config.forecast,
             activation_function=self.config.activation_function,
-            transformer_params=None
+            transformer_params=transformer_params
         )
 
         self.residual_model.compile(

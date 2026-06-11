@@ -9,11 +9,18 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 REPO_ROOT = Path(__file__).resolve().parent
 SRC_ROOT = REPO_ROOT / "src"
 AQUAS_ROOT = REPO_ROOT / "AQUAS_DATA_RETRIEVAL" / "AQUAS_DATA_RETRIEVAL-main"
 DEFAULT_DATA_PATH = AQUAS_ROOT / "data" / "finals" / "demand_diagnosis_joined.parquet"
+DEFAULT_TRAINED_MODELS_DIR = REPO_ROOT.parent / "trained_models"
+DEFAULT_QUANTIZED_MODELS_DIR = REPO_ROOT.parent / "quantized_models"
+DEFAULT_BEST_FEATURES_PREFIX = REPO_ROOT.parent / "data" / "best_features" / "BEST_features_NOSMOOTH_"
 
 
 class PredapHelpFormatter(
@@ -32,6 +39,12 @@ def _ensure_local_imports() -> None:
 
 # Ensure local imports early so we can safely override pandas CSV reader before other modules import it.
 _ensure_local_imports()
+try:
+    # On Windows, importing pandas/pyarrow before TensorFlow can load DLLs that
+    # make TensorFlow's native runtime fail later. Preload TensorFlow when present.
+    import tensorflow  # noqa: F401
+except Exception:
+    pass
 try:
     from src.utils.experiments_utils import smart_read
     import pandas as pd
@@ -111,6 +124,83 @@ def _filter_codes_in_dataset(codes: list[str], data_path: Path) -> list[str]:
     return resolved_codes
 
 
+def _best_feature_file_candidates(prefix: Path | str, code: str) -> list[Path]:
+    prefix_path = Path(prefix)
+    if prefix_path.suffix.lower() == ".xlsx":
+        return [prefix_path]
+
+    code_text = str(code).strip().replace("#", ":")
+    variants = [
+        code_text,
+        code_text.replace("__", "_"),
+        code_text.replace(":", "#"),
+        code_text.upper(),
+    ]
+    if code_text.startswith("DEMAND_"):
+        variants.append(code_text[len("DEMAND_"):])
+    else:
+        variants.append(f"DEMAND_{code_text}")
+
+    ordered = []
+    for variant in variants:
+        for normalized in (variant, variant.replace("__", "_")):
+            path = Path(f"{prefix_path}{normalized}.xlsx")
+            if path not in ordered:
+                ordered.append(path)
+    return ordered
+
+
+def _best_feature_lags(code: str, prefix: Path | str) -> set[int]:
+    import pandas as pd
+
+    candidates = _best_feature_file_candidates(prefix, code)
+    selected_path = next((path for path in candidates if path.exists()), None)
+    if selected_path is None:
+        tried = ", ".join(str(path) for path in candidates)
+        raise FileNotFoundError(
+            f"No BEST_features file found for code '{code}'. Tried: {tried}"
+        )
+
+    df = pd.read_excel(selected_path, engine="openpyxl")
+    if "LAG" not in df.columns:
+        raise ValueError(f"BEST_features file has no LAG column: {selected_path}")
+
+    lags = set(df["LAG"].dropna().astype(int).tolist())
+    print(f"-> INFO: Available BEST_features LAGs for {code}: {sorted(lags)}")
+    return lags
+
+
+def _filter_temporal_pairs_by_best_features(
+    code: str,
+    temporal_pairs: list[tuple[int, int]],
+    prefix: Path | str,
+) -> list[tuple[int, int]]:
+    valid_lags = _best_feature_lags(code, prefix)
+    filtered_pairs = [
+        (lookback, forecast)
+        for lookback, forecast in temporal_pairs
+        if forecast in valid_lags
+    ]
+    skipped = [
+        (lookback, forecast)
+        for lookback, forecast in temporal_pairs
+        if forecast not in valid_lags
+    ]
+    if skipped:
+        skipped_text = ", ".join(f"{lookback}/{forecast}" for lookback, forecast in skipped)
+        print(
+            f"-> WARNING: Skipping unsupported lookback/forecast pairs for {code}: "
+            f"{skipped_text}. Forecast must exist as LAG in data/best_features."
+        )
+    if not filtered_pairs:
+        raise ValueError(
+            f"No requested forecasts for {code} exist in data/best_features. "
+            f"Requested {[forecast for _, forecast in temporal_pairs]}, "
+            f"available {sorted(valid_lags)}."
+        )
+    return filtered_pairs
+
+
 def _temporal_pairs(
     *,
     lookback: int,
@@ -120,7 +210,13 @@ def _temporal_pairs(
     default_lookbacks: list[int] | None = None,
     default_forecasts: list[int] | None = None,
 ) -> list[tuple[int, int]]:
-    if lookbacks is None and forecasts is None and default_lookbacks is not None:
+    if (
+        lookback is None
+        and forecast is None
+        and lookbacks is None
+        and forecasts is None
+        and default_lookbacks is not None
+    ):
         lookbacks = default_lookbacks
         forecasts = default_forecasts
     else:
@@ -240,7 +336,7 @@ def _run_one_training(args: argparse.Namespace, code: str, lookback: int, foreca
     if args.stage in {"diagnostic", "full"}:
         diag_kwargs = dict(base_kwargs)
         if args.diagnostic_covariates_prefix:
-            diag_kwargs["diagnostic_covariates_path"] = args.diagnostic_covariates_prefix
+            diag_kwargs["diagnostic_covariates_path"] = str(args.diagnostic_covariates_prefix)
         diag_config = DiagnosticResidualTransformerConfig(
             **diag_kwargs,
             predictions_train_corrected=(
@@ -278,7 +374,12 @@ def cmd_train(args: argparse.Namespace) -> int:
     )
 
     for code in codes:
-        for lookback, forecast in temporal_pairs:
+        code_temporal_pairs = _filter_temporal_pairs_by_best_features(
+            code,
+            temporal_pairs,
+            args.diagnostic_covariates_prefix,
+        )
+        for lookback, forecast in code_temporal_pairs:
             _run_one_training(args, code=code, lookback=lookback, forecast=forecast)
     return 0
 
@@ -327,10 +428,17 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
     final_output_df = pd.DataFrame()
     pipeline = None
     for code in codes:
+        code_temporal_pairs = _filter_temporal_pairs_by_best_features(
+            code,
+            temporal_pairs,
+            args.diagnostic_covariates_prefix,
+        )
         config_kwargs = {
             "code": code,
             "data_path": str(args.data_path),
             "model_folder": str(args.model_folder),
+            "lookback": code_temporal_pairs[0][0],
+            "forecast": code_temporal_pairs[0][1],
             "cutoff_date": args.cutoff_date,
             "covid_token": args.covid_token,
             "positional_encoding": args.positional_encoding,
@@ -349,7 +457,7 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
             "final_cutoff_date": args.max_date,
         }
         if args.diagnostic_covariates_prefix:
-            config_kwargs["diagnostic_covariates_path"] = args.diagnostic_covariates_prefix
+            config_kwargs["diagnostic_covariates_path"] = str(args.diagnostic_covariates_prefix)
 
         config = BaseTransformerConfig(
             **config_kwargs,
@@ -360,8 +468,8 @@ def cmd_reconstruct(args: argparse.Namespace) -> int:
             input_directory=str(args.data_path),
             old_input_directory=str(args.old_data_path or args.data_path),
             code=code,
-            LOOKBACK_LIST=[lookback for lookback, _ in temporal_pairs],
-            FORECAST_LIST=[forecast for _, forecast in temporal_pairs],
+            LOOKBACK_LIST=[lookback for lookback, _ in code_temporal_pairs],
+            FORECAST_LIST=[forecast for _, forecast in code_temporal_pairs],
             final_output_predictions=None,
             final_output_df=final_output_df,
             prediction_dates=prediction_dates,
@@ -388,27 +496,6 @@ def cmd_quantize(args: argparse.Namespace) -> int:
     pipeline = ModelQuantizationPipeline(config=BaseTransformerConfig())
     scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
 
-    # If the user provided a direct model path, skip temporal pairing and quantize directly.
-    if getattr(args, 'model_path', None):
-        for code in args.codes:
-            models = pipeline.run_quantization_pipeline(
-                exp_names=args.experiments,
-                input_directory=str(args.data_path),
-                code=code,
-                lookback=None,
-                forecast=None,
-                cutoff_date=args.cutoff_date,
-                max_date=args.max_date,
-                scaler=scaler,
-                eliminate_covid_data=args.eliminate_covid_data,
-                covid_dates=None,
-                trained_model_folder=str(args.trained_model_folder),
-                quantized_weights_folder=str(args.quantized_weights_folder),
-                model_path=str(args.model_path),
-            )
-            # Skip evaluation when lookback/forecast not provided
-        return 0
-
     temporal_pairs = _temporal_pairs(
         lookback=args.lookback,
         forecast=args.forecast,
@@ -417,7 +504,12 @@ def cmd_quantize(args: argparse.Namespace) -> int:
     )
 
     for code in args.codes:
-        for lookback, forecast in temporal_pairs:
+        code_temporal_pairs = _filter_temporal_pairs_by_best_features(
+            code,
+            temporal_pairs,
+            args.diagnostic_covariates_prefix,
+        )
+        for lookback, forecast in code_temporal_pairs:
             models = pipeline.run_quantization_pipeline(
                 exp_names=args.experiments,
                 input_directory=str(args.data_path),
@@ -431,9 +523,9 @@ def cmd_quantize(args: argparse.Namespace) -> int:
                 covid_dates=None,
                 trained_model_folder=str(args.trained_model_folder),
                 quantized_weights_folder=str(args.quantized_weights_folder),
-                model_path=None,
+                model_path=str(args.model_path) if args.model_path else None,
             )
-            if args.evaluate:
+            if args.evaluate and all(model is not None for model in models):
                 pipeline.eval_quantization_impact(
                     input_directory=str(args.data_path),
                     code=code,
@@ -448,19 +540,33 @@ def cmd_quantize(args: argparse.Namespace) -> int:
                     quant_univ_model=models[3],
                     quant_diagnostics_model=models[4],
                     quant_seasonal_model=models[5],
+                    eliminate_covid_data=args.eliminate_covid_data,
+                    covid_dates=None,
+                )
+            elif args.evaluate:
+                print(
+                    "-> WARNING: Skipping quantization evaluation because a complete "
+                    "univariate+diagnostics+seasonal stack was not loaded."
                 )
     return 0
 
 
-def add_model_args(parser: argparse.ArgumentParser) -> None:
+def add_model_args(
+    parser: argparse.ArgumentParser,
+    *,
+    model_folder_default: Path,
+    model_folder_help: str,
+    lookback_default: int | None = 7,
+    forecast_default: int | None = 7,
+) -> None:
     parser.add_argument("--code", default="DEMAND_DEMANDA_TOTAL", help="Single demand or diagnosis code to process.")
     parser.add_argument("--codes", type=_csv_strings, help="Comma-separated list of codes. Overrides --code.")
-    parser.add_argument("--lookback", type=int, default=7, help="Single lookback window, in days.")
-    parser.add_argument("--forecast", type=int, default=7, help="Single forecast horizon, in days.")
+    parser.add_argument("--lookback", type=int, default=lookback_default, help="Single lookback window, in days.")
+    parser.add_argument("--forecast", type=int, default=forecast_default, help="Single forecast horizon, in days.")
     parser.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. A single --forecast value is reused when --forecasts is omitted.")
     parser.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. A single --lookback value is reused when --lookbacks is omitted.")
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Input dataset used for training or reconstruction.")
-    parser.add_argument("--model-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Folder containing model outputs or quantized weights.")
+    parser.add_argument("--model-folder", type=Path, default=model_folder_default, help=model_folder_help)
     parser.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for training/evaluation.")
     parser.add_argument("--max-date", default="2025-12-31", help="Last date kept for training/evaluation.")
     parser.add_argument("--covid-token", action=argparse.BooleanOptionalAction, default=True, help="Enable or disable the COVID indicator feature.")
@@ -478,6 +584,25 @@ def add_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--activation-function", default="gelu", help="Activation function used by transformer blocks.")
 
 
+def add_reconstruct_args(parser: argparse.ArgumentParser) -> None:
+    add_model_args(
+        parser,
+        model_folder_default=DEFAULT_QUANTIZED_MODELS_DIR,
+        model_folder_help="Directory containing quantized production weights.",
+        lookback_default=None,
+        forecast_default=None,
+    )
+    parser.add_argument("--old-data-path", type=Path, help="Previous production dataset used for comparison/cleanup. Defaults to --data-path.")
+    parser.add_argument("--all-codes", action="store_true", help="Read all available codes from --data-path instead of using --code/--codes.")
+    parser.add_argument("--prediction-dates", type=_csv_strings, help="Comma-separated prediction dates formatted YYYY-MM-DD.")
+    parser.add_argument("--prediction-start", help="Start date for a daily prediction range, formatted YYYY-MM-DD.")
+    parser.add_argument("--prediction-end", help="End date for a daily prediction range, formatted YYYY-MM-DD.")
+    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT.parent / "production_predictions" / "final_output_predictions", help="Directory where prediction outputs are written.")
+    parser.add_argument("--metrics-path", type=Path, default=REPO_ROOT.parent / "production_predictions" / "production_evaluation_metrics.parquet", help="Metrics parquet used when deleting old production rows.")
+    parser.add_argument("--diagnostic-covariates-prefix", type=Path, default=DEFAULT_BEST_FEATURES_PREFIX, help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
+    parser.add_argument("--delete-old", action=argparse.BooleanOptionalAction, default=True, help="Delete/update old prediction, real-data, and metrics rows after reconstruction.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python predap_cli.py",
@@ -492,13 +617,14 @@ def build_parser() -> argparse.ArgumentParser:
   train         Train univariate, diagnostic residual, seasonal residual, or full model stacks.
   quantize      Convert trained MLflow models into production weight files.
   reconstruct   Rebuild quantized models and write production predictions.
+  predict       Alias of reconstruct.
 
 Common examples:
   python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
   python predap_cli.py aquas -- --sample --all
   python predap_cli.py train --stage univariate --code TOTAL --lookbacks 7,14 --forecasts 7,14
   python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14
-  python predap_cli.py reconstruct --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
+  python predap_cli.py predict --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
 
 Use "python predap_cli.py <method> --help" to see all options for a method.
 """,
@@ -557,14 +683,18 @@ Examples:
   python predap_cli.py train --stage full --codes TOTAL --epochs 50 --batch-size 32
 """,
     )
-    add_model_args(train)
+    add_model_args(
+        train,
+        model_folder_default=DEFAULT_TRAINED_MODELS_DIR,
+        model_folder_help="Directory where trained Keras models are saved.",
+    )
     train.add_argument(
         "--stage",
         choices=["univariate", "diagnostic", "diagnostics", "seasonal", "full"],
         default="full",
         help="Training stage or complete stack to run. 'diagnostics' is accepted as an alias for 'diagnostic'.",
     )
-    train.add_argument("--diagnostic-covariates-prefix", help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
+    train.add_argument("--diagnostic-covariates-prefix", type=Path, default=DEFAULT_BEST_FEATURES_PREFIX, help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
     train.set_defaults(func=cmd_train)
 
     reconstruct = subparsers.add_parser(
@@ -584,17 +714,28 @@ Examples:
   python predap_cli.py reconstruct --all-codes --lookbacks 7,14,60 --forecasts 7,14,30 --no-delete-old
 """,
     )
-    add_model_args(reconstruct)
-    reconstruct.add_argument("--old-data-path", type=Path, help="Previous production dataset used for comparison/cleanup. Defaults to --data-path.")
-    reconstruct.add_argument("--all-codes", action="store_true", help="Read all available codes from --data-path instead of using --code/--codes.")
-    reconstruct.add_argument("--prediction-dates", type=_csv_strings, help="Comma-separated prediction dates formatted YYYY-MM-DD.")
-    reconstruct.add_argument("--prediction-start", help="Start date for a daily prediction range, formatted YYYY-MM-DD.")
-    reconstruct.add_argument("--prediction-end", help="End date for a daily prediction range, formatted YYYY-MM-DD.")
-    reconstruct.add_argument("--output-dir", type=Path, default=REPO_ROOT.parent / "production_predictions" / "final_output_predictions", help="Directory where prediction outputs are written.")
-    reconstruct.add_argument("--metrics-path", type=Path, default=REPO_ROOT.parent / "production_predictions" / "production_evaluation_metrics.parquet", help="Metrics parquet used when deleting old production rows.")
-    reconstruct.add_argument("--diagnostic-covariates-prefix", help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
-    reconstruct.add_argument("--delete-old", action=argparse.BooleanOptionalAction, default=True, help="Delete/update old prediction, real-data, and metrics rows after reconstruction.")
+    add_reconstruct_args(reconstruct)
     reconstruct.set_defaults(func=cmd_reconstruct)
+
+    predict = subparsers.add_parser(
+        "predict",
+        formatter_class=PredapHelpFormatter,
+        help="Alias of reconstruct: rebuild quantized models and write predictions.",
+        description=(
+            "Alias of reconstruct. Load quantized weights, rebuild the model stack, "
+            "and write production predictions for selected codes and dates."
+        ),
+        epilog="""Date selection:
+  --prediction-dates 2025-12-23,2025-12-24
+  --prediction-start 2025-12-23 --prediction-end 2025-12-31
+
+Examples:
+  python predap_cli.py predict --code TOTAL --prediction-start 2025-12-23 --prediction-end 2025-12-31
+  python predap_cli.py predict --all-codes --lookbacks 7,14,60 --forecasts 7,14,30 --no-delete-old
+""",
+    )
+    add_reconstruct_args(predict)
+    predict.set_defaults(func=cmd_reconstruct)
 
     quantize = subparsers.add_parser(
         "quantize",
@@ -602,22 +743,23 @@ Examples:
         help="Quantize MLflow or local models into production weight files.",
         description="Load trained MLflow runs or local model outputs and save float16 production weights.",
         epilog="""Examples:
-  python predap_cli.py quantize --trained-model-folder ../transformer_outputs/models_covid_token --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
+  python predap_cli.py quantize --trained-model-folder ../trained_models --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
   python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14 --evaluate
 """,
     )
     quantize.add_argument("--experiments", type=_csv_strings, help="Comma-separated MLflow experiment names to search. If omitted, local models are loaded from --trained-model-folder.")
-    quantize.add_argument("--trained-model-folder", type=Path, default=REPO_ROOT.parent / "transformer_outputs" / "models_covid_token", help="Local base folder containing trained model outputs organized by code.")
-    quantize.add_argument("--model-path", type=Path, help="Direct path to a model file (.keras) or a code folder containing model subfolders to quantize.")
-    quantize.add_argument("--quantized-weights-folder", type=Path, default=REPO_ROOT.parent / "quantized_models", help="Directory where quantized weight files are written.")
+    quantize.add_argument("--trained-model-folder", type=Path, default=DEFAULT_TRAINED_MODELS_DIR, help="Local base folder containing trained Keras models organized by code.")
+    quantize.add_argument("--model-path", type=Path, help="Direct path to a .keras model file or a code folder containing model subfolders to quantize.")
+    quantize.add_argument("--quantized-weights-folder", type=Path, default=DEFAULT_QUANTIZED_MODELS_DIR, help="Directory where quantized weight files are written.")
     quantize.add_argument("--codes", type=_csv_strings, required=True, help="Comma-separated codes to quantize.")
-    quantize.add_argument("--data-path", type=Path, default=REPO_ROOT.parent / "data" / "FINAL_DB" / "finals_combined.csv", help="Input dataset used for quantization checks.")
+    quantize.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Input dataset used for quantization checks.")
     quantize.add_argument("--lookback", type=int, default=7, help="Single lookback window, in days.")
     quantize.add_argument("--forecast", type=int, default=7, help="Single forecast horizon, in days.")
     quantize.add_argument("--lookbacks", type=_csv_ints, help="Comma-separated lookback windows. Must match --forecasts length.")
     quantize.add_argument("--forecasts", type=_csv_ints, help="Comma-separated forecast horizons. Must match --lookbacks length.")
     quantize.add_argument("--cutoff-date", default="2008-01-01", help="First date kept for quantization evaluation.")
     quantize.add_argument("--max-date", default="2025-12-31", help="Last date kept for quantization evaluation.")
+    quantize.add_argument("--diagnostic-covariates-prefix", type=Path, default=DEFAULT_BEST_FEATURES_PREFIX, help="Prefix/path for BEST_features_NOSMOOTH diagnostic covariate files.")
     quantize.add_argument("--eliminate-covid-data", action=argparse.BooleanOptionalAction, default=False, help="Exclude COVID-period rows during quantization evaluation.")
     quantize.add_argument("--evaluate", action=argparse.BooleanOptionalAction, default=False, help="Evaluate original versus quantized model outputs.")
     quantize.set_defaults(func=cmd_quantize)

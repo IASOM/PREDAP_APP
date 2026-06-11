@@ -1,0 +1,27 @@
+{
+  "lookback": 7,
+  "forecast": 14,
+  "code": "DEMAND_DEMANDA_TOTAL",
+  "head_size": 4,
+  "num_heads": 1,
+  "ff_dim": 8,
+  "num_transformer_blocks": 1,
+  "mlp_units": [
+    8
+  ],
+  "dropout": 0.0,
+  "learning_rate": 0.001,
+  "epochs": 1,
+  "batch_size": 1024,
+  "cutoff_date": "2008-01-01",
+  "covid_token": true,
+  "positional_encoding": true,
+  "activation_function": "gelu",
+  "evaluate_model": false,
+  "data_path": "C:\\Users\\Guillem\\Desktop\\PREDAP_APP\\TRANSFORMERS_PREDAP\\AQUAS_DATA_RETRIEVAL\\AQUAS_DATA_RETRIEVAL-main\\data\\finals\\demand_diagnosis_joined.parquet",
+  "scaler": "FunctionTransformer",
+  "scaler_repr": "FunctionTransformer(check_inverse=False,\n                    func=<function BaseTransformerConfig.<lambda> at 0x000001FE4421A5F0>,\n                    inverse_func=<function BaseTransformerConfig.<lambda> at 0x000001FE4421A680>)",
+  "model_name": "DEMAND_DEMANDA_TOTAL_base_transformer_14fh_8ff_7lb_0.001lr.keras",
+  "saved_at": "2026-06-11T10:16:39.378892Z",
+  "model_folder": "C:\\Users\\Guillem\\Desktop\\PREDAP_APP\\trained_models\\DEMAND_DEMANDA_TOTAL\\univariate_model"
+}

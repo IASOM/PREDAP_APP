@@ -1,0 +1,57 @@
+{
+  "lookback": 7,
+  "forecast": 30,
+  "code": "DEMAND_DEMANDA_TOTAL",
+  "head_size": 4,
+  "num_heads": 1,
+  "ff_dim": 8,
+  "num_transformer_blocks": 1,
+  "mlp_units": [
+    8
+  ],
+  "dropout": 0.0,
+  "activation_function": "gelu",
+  "learning_rate": 0.001,
+  "lr_max_multiplier": 100,
+  "lr_min_multiplier": 10,
+  "lr_warmup_ratio": 0.2,
+  "epochs": 1,
+  "batch_size": 1024,
+  "cutoff_date": "2008-01-01",
+  "max_date": "2025-12-31",
+  "final_cutoff_date": "2025-12-31",
+  "covid_token": true,
+  "positional_encoding": true,
+  "evaluate_model": false,
+  "data_path": "C:\\Users\\Guillem\\Desktop\\PREDAP_APP\\TRANSFORMERS_PREDAP\\AQUAS_DATA_RETRIEVAL\\AQUAS_DATA_RETRIEVAL-main\\data\\finals\\demand_diagnosis_joined.parquet",
+  "model_folder": "C:\\Users\\Guillem\\Desktop\\PREDAP_APP\\trained_models\\DEMAND_DEMANDA_TOTAL\\diagnostics_model",
+  "plots_dir": "plots",
+  "production_predictions_dir": "production_predictions/final_output_predictions",
+  "production_predictions_file": "production_predictions/final_output_predictions.parquet",
+  "production_metrics_file": "production_predictions/production_evaluation_metrics.parquet",
+  "default_split_ratio": 0.8,
+  "eliminate_covid_data": false,
+  "covid_dates": [
+    [
+      "2020-03-01",
+      "2020-06-30"
+    ],
+    [
+      "2020-10-01",
+      "2020-12-31"
+    ],
+    [
+      "2021-01-01",
+      "2021-03-31"
+    ],
+    [
+      "2021-04-01",
+      "2021-06-30"
+    ]
+  ],
+  "save_train_history": true,
+  "scaler": "FunctionTransformer",
+  "scaler_repr": "FunctionTransformer(check_inverse=False,\n                    func=<function BaseTransformerConfig.<lambda> at 0x0000021468507910>,\n                    inverse_func=<function BaseTransformerConfig.<lambda> at 0x00000214685079A0>)",
+  "model_name": "DEMAND_DEMANDA_TOTAL_DIAGNOSTIC_RESIDUALS_LEARNING_30fh_8ff_7lb_0.001initlr.keras",
+  "saved_at": "2026-06-11T10:36:34.857774Z"
+}

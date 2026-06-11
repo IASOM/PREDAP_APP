@@ -1,7 +1,10 @@
 
 
 import keras
-import mlflow
+try:
+    import mlflow
+except Exception:
+    mlflow = None
 from sklearn.preprocessing import FunctionTransformer
 import tensorflow as tf
 import numpy as np
@@ -124,6 +127,9 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             candidates.append(original.upper()[len("DEMAND_"):])
         if canonical not in candidates:
             candidates.append(canonical)
+        demand_prefixed = f"DEMAND_{canonical}"
+        if demand_prefixed not in candidates:
+            candidates.append(demand_prefixed)
         if canonical.startswith("DEMANDA_"):
             stripped = canonical[len("DEMANDA_"):]
             if stripped not in candidates:
@@ -171,14 +177,21 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
                 f" Tried codes: {candidates}."
             )
 
-        search_pattern = re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE)
+        search_patterns = [
+            re.compile(rf".*{forecast}fh.*{lookback}lb.*\.keras$", re.IGNORECASE),
+            re.compile(rf".*{lookback}lb.*{forecast}fh.*\.keras$", re.IGNORECASE),
+        ]
         for model_dir in model_dirs:
             candidates = [
                 path
                 for path in model_dir.iterdir()
                 if path.is_file() and path.suffix.lower() == ".keras"
             ]
-            exact_matches = [path for path in candidates if search_pattern.match(path.name)]
+            exact_matches = [
+                path
+                for path in candidates
+                if any(pattern.match(path.name) for pattern in search_patterns)
+            ]
             if exact_matches:
                 exact_matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
                 selected = exact_matches[0]
@@ -272,7 +285,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         Returns:
             str: The full path where the weights were saved."""
         base_folder = Path(quantized_weights_folder or "quantized_models")
-        save_weights_path = base_folder / code / model_name / f"{code}_{model_name}_{forecast}fh_{lookback}lb_f16_weights.h5"
+        save_weights_path = base_folder / code / model_name / f"{code}_{model_name}_{forecast}fh_{lookback}lb_f16.weights.h5"
         save_weights_path.parent.mkdir(parents=True, exist_ok=True)
         quant_model.save_weights(str(save_weights_path))
         print(f"✓ Quantized weights saved to {save_weights_path}")
@@ -296,6 +309,8 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             ValueError: If experiments don't exist or no matching run is found.
         """
         # Ensure exp_names is a list
+        if mlflow is None:
+            raise ValueError("MLflow is not installed. Use --trained-model-folder or --model-path for local quantization.")
         if isinstance(exp_names, str):
             exp_names = [exp_names]
         
@@ -367,7 +382,8 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
     
     def eval_quantization_impact(self, input_directory, code, lookback, forecast,cutoff_date, 
                                  max_date,scaler, univ_model, diagnostics_model, seasonal_model, 
-                                 quant_univ_model, quant_diagnostics_model, quant_seasonal_model):
+                                 quant_univ_model, quant_diagnostics_model, quant_seasonal_model,
+                                 eliminate_covid_data=False, covid_dates=None):
         """Evaluate the impact of quantization on model performance by comparing the original and quantized models on the same test set.
         Args:
             input_directory (str): The directory path where the test data is stored.
@@ -524,6 +540,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         print(f"\n{'='*70}")
         print(f"QUANTIZATION PIPELINE - Loading Models")
         print(f"{'='*70}")
+        output_code = code
 
         # Priority: explicit model_path -> MLflow experiments -> trained_model_folder
         if model_path:
@@ -665,6 +682,10 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
             seasonal_model = self.load_mlflow_model(run_id, seasonal_model_name_in_run, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
         elif trained_model_folder:
             print(f"\n📥 Loading local models from folder {trained_model_folder}...")
+            for candidate_code in self._local_model_code_candidates(code):
+                if (Path(trained_model_folder) / candidate_code).exists():
+                    output_code = candidate_code
+                    break
             univ_model = self.load_local_model(trained_model_folder, code, "univariate_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_UNIV)
             diagnostics_model = self.load_local_model(trained_model_folder, code, "diagnostics_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
             seasonal_model = self.load_local_model(trained_model_folder, code, "seasonal_model", lookback, forecast, custom_objects=CUSTOM_OBJECTS_RESIDUAL)
@@ -686,7 +707,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         self.save_quantized_model_weights(
             quant_univ_model,
             "univariate_model",
-            code,
+            output_code,
             forecast,
             lookback,
             quantized_weights_folder=quantized_weights_folder,
@@ -694,7 +715,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         self.save_quantized_model_weights(
             quant_diagnostics_model,
             "diagnostics_model",
-            code,
+            output_code,
             forecast,
             lookback,
             quantized_weights_folder=quantized_weights_folder,
@@ -702,7 +723,7 @@ class ModelQuantizationPipeline(DataPreparationInProduction):
         self.save_quantized_model_weights(
             quant_seasonal_model,
             "seasonal_model",
-            code,
+            output_code,
             forecast,
             lookback,
             quantized_weights_folder=quantized_weights_folder,

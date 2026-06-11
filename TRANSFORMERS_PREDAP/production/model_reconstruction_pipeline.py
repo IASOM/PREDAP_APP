@@ -121,25 +121,28 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         weights_path = os.path.join(
             code_dir,
             model_type,
-            f"{model_code}_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5",
+            f"{model_code}_{model_type}_{forecast}fh_{lookback}lb_f16.weights.h5",
         )
         if os.path.exists(weights_path):
             return weights_path
 
         model_type_dir = os.path.join(code_dir, model_type)
         if os.path.isdir(model_type_dir):
-            suffix = f"_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5"
+            suffixes = (
+                f"_{model_type}_{forecast}fh_{lookback}lb_f16.weights.h5",
+                f"_{model_type}_{forecast}fh_{lookback}lb_f16_weights.h5",
+            )
             matches = [
                 os.path.join(model_type_dir, name)
                 for name in os.listdir(model_type_dir)
-                if name.endswith(suffix)
+                if any(name.endswith(suffix) for suffix in suffixes)
             ]
             if len(matches) == 1:
                 print(f"-> INFO: Resolved weights file by suffix: {matches[0]}")
                 return matches[0]
 
         raise FileNotFoundError(
-                    scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
+            f"Could not find weights for code='{code}', model_type='{model_type}', "
             f"forecast={forecast}, lookback={lookback}. Tried: {weights_path}"
         )
 
@@ -179,13 +182,13 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             A tuple containing the reconstructed univariate model, diagnostics residual model, and seasonal residual model with loaded weights.
         """
         
-        DEFAULT_RESIDUAL_TRANSFORMER_PARAMS =  {
-            'head_size': 16,
-            'num_heads': 16,
-            'ff_dim': 512,
-            'mlp_units': [256, 128],
-            'num_transformer_blocks': 2,
-            'dropout': 0
+        residual_transformer_params =  {
+            'head_size': head_size,
+            'num_heads': num_heads,
+            'ff_dim': ff_dim,
+            'mlp_units': mlp_units,
+            'num_transformer_blocks': num_transformer_blocks,
+            'dropout': dropout,
         }
         
         
@@ -208,7 +211,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         diagnostics_model = self.create_residual_transformer_model(
             input_shape= diagnostics_input_shape,
             forecast = forecast,
-            transformer_params=DEFAULT_RESIDUAL_TRANSFORMER_PARAMS, 
+            transformer_params=residual_transformer_params, 
             activation_function=activation_function
         )
 
@@ -217,7 +220,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
         seasonal_model = self.create_residual_transformer_model(
             input_shape= seasonal_input_shape,
             forecast = forecast,
-            transformer_params=DEFAULT_RESIDUAL_TRANSFORMER_PARAMS,
+            transformer_params=residual_transformer_params,
             activation_function=activation_function
         )
 
@@ -278,7 +281,7 @@ class ModelPredictionPipeline(DataPreparationInProduction):
             final_output_predictions: Optional[np.ndarray], 
             final_output_df: pd.DataFrame,
             prediction_dates: Optional[List[str]] = None,
-                scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False)
+            scaler = FunctionTransformer(func=lambda x: x, inverse_func=lambda x: x, check_inverse=False),
             ) -> pd.DataFrame:
         """Runs the full pipeline to reconstruct the model, make predictions, and save results for a given code and list of lookback and forecast combinations. 
         Args:

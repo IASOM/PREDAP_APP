@@ -80,7 +80,7 @@ def train_given_model_and_data(model, X, Y, batch_size=1024, model_name=None, ep
         # Optional: Delete the cloned dictionary to free up CPU memory immediately
         del clean_history
     
-    if save_model and epochs > 1:  # save model
+    if save_model:  # save model
         save_folder = model_folder or default_config.model_folder
         os.makedirs(save_folder, exist_ok=True)
         save_path = os.path.join(save_folder, model_name)

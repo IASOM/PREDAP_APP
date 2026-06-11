@@ -174,14 +174,17 @@ class DataPreparationInProduction:
             if selected_path is None:
                 raise FileNotFoundError(
                     f"Diagnostic covariates file not found for code '{code}'. "
-                    f"Tried: {', '.join(candidates)}"
+                    f"Tried: {', '.join(candidates)}. "
+                    "Use a code/forecast with BEST_features data."
                 )
 
             diagnostic_covariates_df = pd.read_excel(selected_path, engine='openpyxl')
             matching_rows = diagnostic_covariates_df[diagnostic_covariates_df['LAG'] ==  forecast]
             if matching_rows.empty:
+                available_lags = sorted(diagnostic_covariates_df['LAG'].dropna().astype(int).unique().tolist())
                 raise ValueError(
-                    f"No diagnostic covariates row found in {selected_path} for LAG={forecast}."
+                    f"No diagnostic covariates row found in {selected_path} "
+                    f"for LAG={forecast}. Available LAG values: {available_lags}."
                 )
             predictors_value = matching_rows['predictors'].iloc[0]
             diagnostic_covariates_list = [
@@ -223,23 +226,17 @@ class DataPreparationInProduction:
         
         df = data_preparation.cut_dataframe(df, cutoff_date,max_date, data_path)
 
-        categorical_vars = ["Day_of_Week", "Month", "Season", "Holiday", "School_Vacation","Is_Weekend"]
-        df_dates = data_preparation.prepare_time_series_features(df, categorical_vars=categorical_vars, cutoff_date=cutoff_date, max_date=max_date, scaler=scaler, eliminate_covid_data=eliminate_covid_data, covid_dates=covid_dates)
         df_timestamp = df['timestamp']
-        df_dates = df_dates.drop(columns=['timestamp']) 
          
-        # univariate scenario ...................................................
+        # Match the training univariate contract: target series plus optional COVID token.
         target_col = self._resolve_column(df.columns, code, "target code")
-        feature_cols = target_col
         
-        # Convert to numpy arrays
-        X_raw = df[feature_cols].values.reshape(-1, 1)  
-        X_raw = np.hstack((X_raw, df_dates.values.astype(np.float32)))
-        Y_raw = df[target_col].values # Target values
+        X_raw = df[target_col].values.reshape(-1, 1).astype(np.float32)
+        Y_raw = df[target_col].values.astype(np.float32)
         
         if covid_token:
             df_covid = data_preparation.add_covid_token(df)
-            covid_feature = df_covid['covid_token'].values.reshape(-1, 1)
+            covid_feature = df_covid['covid_token'].values.reshape(-1, 1).astype(np.float32)
             X_raw = np.hstack((X_raw, covid_feature))
 
         if production_mode:
@@ -293,36 +290,23 @@ class DataPreparationInProduction:
             df = data_preparation.eliminate_covid_dates(df, covid_dates)
         df = data_preparation.cut_dataframe(df, cutoff_date,max_date, data_path)
 
-        categorical_vars = ["Day_of_Week", 
-                                "Month", 
-                                "Season", 
-                                "Holiday", 
-                                "School_Vacation",
-                                "Is_Weekend",
-                                ]
-        df_dates = data_preparation.prepare_time_series_features(df, categorical_vars=categorical_vars, cutoff_date=cutoff_date, max_date=max_date, scaler=scaler, eliminate_covid_data=eliminate_covid_data, covid_dates=covid_dates)
-        df_dates = df_dates.drop(columns=['timestamp']) 
-        
-        
-        # multivariate scenario ..................................................
-        # Select feature columns (exclude timestamp & target)
+        # Match the training diagnostics contract: selected diagnostic predictors plus optional COVID token.
         target_col = self._resolve_column(df.columns, code, "target code")
         df_features = df.drop(columns = ['timestamp'])
-        # Convert DataFrame to numpy arrays
+
         if relevant_feature_cols is not None:
             X_raw = self._resolve_feature_values(
                 df_features,
                 relevant_feature_cols,
                 "diagnostic predictor columns",
-            )
-            X_raw = np.hstack((X_raw, df_dates.values.astype(np.float32)))
+            ).astype(np.float32)
         else:
-            X_raw = df_features.values
+            X_raw = df_features.values.astype(np.float32)
 
-        Y_raw = df[target_col].values
+        Y_raw = df[target_col].values.astype(np.float32)
         if covid_token:
             df_covid = data_preparation.add_covid_token(df)
-            covid_feature = df_covid['covid_token'].values.reshape(-1, 1)
+            covid_feature = df_covid['covid_token'].values.reshape(-1, 1).astype(np.float32)
             
             X_raw = np.hstack((X_raw, covid_feature))
 

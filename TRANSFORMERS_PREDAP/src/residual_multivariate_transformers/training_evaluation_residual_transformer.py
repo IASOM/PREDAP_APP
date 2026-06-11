@@ -164,7 +164,7 @@ def train_given_model_and_data(model, X, Y,
         print(f"Training history saved to: {history_filename}")
     
     # Save model
-    if save_model and epochs > 1:
+    if save_model:
         save_folder = model_folder or default_config.model_folder
         os.makedirs(save_folder, exist_ok=True)
         save_path = os.path.join(save_folder, model_name)

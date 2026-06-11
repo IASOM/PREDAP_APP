@@ -169,22 +169,20 @@ class DiagnosticResidualTransformerPipeline:
         
     def load_diagnostic_covariates(self):
         if not os.path.exists(self.config.diagnostic_covariates_path):
-            print(
-                f"-> WARNING: Diagnostic covariates file not found: "
-                f"{self.config.diagnostic_covariates_path}. Continuing without diagnostic predictors."
+            raise FileNotFoundError(
+                "Diagnostic covariates file not found: "
+                f"{self.config.diagnostic_covariates_path}. "
+                "Use a forecast with BEST_features data or pass a valid covariate file."
             )
-            self.diagnostic_covariates_list = []
-            return self.diagnostic_covariates_list
         diagnostic_covariates_df = pd.read_excel(self.config.diagnostic_covariates_path, engine='openpyxl')
         matching_rows = diagnostic_covariates_df[diagnostic_covariates_df['LAG'] == self.config.forecast]
         if matching_rows.empty:
-            print(
-                f"-> WARNING: No diagnostic covariates row found in "
+            available_lags = sorted(diagnostic_covariates_df['LAG'].dropna().astype(int).unique().tolist())
+            raise ValueError(
+                "No diagnostic covariates row found in "
                 f"{self.config.diagnostic_covariates_path} for LAG={self.config.forecast}. "
-                "Continuing without diagnostic predictors."
+                f"Available LAG values: {available_lags}."
             )
-            self.diagnostic_covariates_list = []
-            return self.diagnostic_covariates_list
         self.diagnostic_covariates_list = [
             item.strip()
             for item in str(matching_rows['predictors'].iloc[0]).split(',')
@@ -332,20 +330,21 @@ class DiagnosticResidualTransformerPipeline:
         
         print("Building residual correction model...")
         
-        # Define transformer parameters
-        '''transformer_params = {
+        transformer_params = {
             'head_size': self.config.head_size,
             'num_heads': self.config.num_heads,
             'ff_dim': self.config.ff_dim,
-            'dropout': self.config.dropout
-        }'''
+            'mlp_units': self.config.mlp_units,
+            'num_transformer_blocks': self.config.num_transformer_blocks,
+            'dropout': self.config.dropout,
+        }
         
         # Build the residual model
         self.residual_model = hybrid_lstm_transformer_model(
             input_shape=(self.config.lookback, self.X_train_covs.shape[2]), 
             forecast=self.config.forecast,
             activation_function=self.config.activation_function,
-            transformer_params=None
+            transformer_params=transformer_params
         )
         self.residual_model.compile(
             optimizer=tf.keras.optimizers.Adam(

@@ -100,6 +100,20 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _temporal_pairs(lookback=7, forecast=7, lookbacks=[7, 14], forecasts=[7, 14, 30])
 
+    def test_cli_model_folder_defaults_separate_trained_and_quantized_outputs(self) -> None:
+        from predap_cli import build_parser
+
+        parser = build_parser()
+
+        train_args = parser.parse_args(["train", "--stage", "univariate", "--code", "TOTAL"])
+        quantize_args = parser.parse_args(["quantize", "--codes", "TOTAL"])
+        predict_args = parser.parse_args(["predict", "--code", "TOTAL", "--no-delete-old"])
+
+        self.assertEqual(train_args.model_folder.name, "trained_models")
+        self.assertEqual(quantize_args.trained_model_folder.name, "trained_models")
+        self.assertEqual(quantize_args.quantized_weights_folder.name, "quantized_models")
+        self.assertEqual(predict_args.model_folder.name, "quantized_models")
+
     def test_prediction_output_keeps_temporal_parameter_identity(self) -> None:
         source = _read("production/model_reconstruction_pipeline.py")
         function = _function_node(source, "run_reconstruct_save_results_pipeline")

@@ -388,16 +388,29 @@ def load_base_model_transformer(X_train, X_test,base_path, base_model_name):
     FileNotFoundError
         If the model file does not exist
     """
-    #Load the base transformer model
-    available_models = os.listdir(base_path) if os.path.exists(base_path) else []
-    
-    if base_model_name in available_models:
-        full_path = os.path.join(base_path, base_model_name)
-        print(f"✅ Found base model: {base_model_name}")
-    else:
-        print(f"❌ Base model not found: {base_model_name}")
-        print(f"Available models: {available_models}")
-        return
+    if not os.path.exists(base_path):
+        raise FileNotFoundError(f"Base model folder not found: {base_path}")
+
+    code = base_model_name.split("_base_transformer_", 1)[0]
+    candidate_paths = [
+        os.path.join(base_path, base_model_name),
+        os.path.join(base_path, code, "univariate_model", base_model_name),
+    ]
+    candidate_paths.extend(
+        os.path.join(base_path, folder, "univariate_model", base_model_name)
+        for folder in os.listdir(base_path)
+        if os.path.isdir(os.path.join(base_path, folder))
+    )
+
+    full_path = next((path for path in candidate_paths if os.path.exists(path)), None)
+    if full_path is None:
+        available_models = os.listdir(base_path)
+        raise FileNotFoundError(
+            f"Base model not found: {base_model_name}. "
+            f"Tried: {candidate_paths}. Available entries in {base_path}: {available_models}"
+        )
+
+    print(f"Found base model: {full_path}")
     
     # Load the base model
     model = load_trained_model(full_path)

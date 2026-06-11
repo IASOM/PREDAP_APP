@@ -77,7 +77,7 @@ class BaseTransformerConfig(ABC):
     
     # ==================== PATHS AND DIRECTORIES ====================
     plots_dir: str = 'plots'
-    model_folder: str = '../transformer_outputs/models_covid_token'
+    model_folder: str = '../trained_models'
 
     # Hyperparameter Search Lists
     CODES_LIST: List[str] = field(default_factory=lambda: ["DEMAND_DEMANDA_TOTAL"])

@@ -11,8 +11,6 @@ import numpy as np
 import tensorflow as tf
 from utils.experiments_utils import smart_read
 
-
-import mlflow
 import pickle
 import matplotlib.pyplot as plt
 

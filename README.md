@@ -4,6 +4,7 @@ Aquest repositori agrupa tot el necessari per treballar amb el projecte PREDAP d
 
 - `TRANSFORMERS_PREDAP/`: codi principal de models, entrenament, quantització, inferència, i documentació.
 - `data/`: dades locals del projecte, incloent datasets finals i fitxers de característiques.
+- `trained_models/`: models Keras entrenats pel CLI.
 - `quantized_models/`: peses quantitzades preparades per reconstruir models en producció.
 
 ## Visió general
@@ -77,6 +78,7 @@ El CLI únic ofereix aquestes comandes principals:
 - `train`: entrena models univariants, residuals o el stack complet.
 - `quantize`: converteix models entrenats en pesos quantitzats.
 - `reconstruct`: reconstrueix models quantitzats i escriu prediccions.
+- `predict`: alias de `reconstruct`.
 
 Per veure les opcions específiques:
 
@@ -84,7 +86,16 @@ Per veure les opcions específiques:
 python predap_cli.py train --help
 python predap_cli.py quantize --help
 python predap_cli.py reconstruct --help
+python predap_cli.py predict --help
 ```
+
+Per defecte el CLI treballa amb el parquet real generat per AQUAS:
+
+```text
+TRANSFORMERS_PREDAP/AQUAS_DATA_RETRIEVAL/AQUAS_DATA_RETRIEVAL-main/data/finals/demand_diagnosis_joined.parquet
+```
+
+Els forecasts per entrenar, quantitzar o predir es filtren contra els `LAG` disponibles a `data/best_features/BEST_features_NOSMOOTH_<code>.xlsx`. Per `TOTAL`, els LAG disponibles actuals son `0, 1, 3, 7, 14, 30, 60, 182, 365`; forecasts com `35` o `42` es rebutgen abans d'executar models.
 
 ## Quantització: MLflow o local
 
@@ -100,7 +111,7 @@ python predap_cli.py quantize --experiments EXP1 --codes DEMAND_DEMANDA_TOTAL --
 ```
 
 ```bash
-python predap_cli.py quantize --trained-model-folder ../transformer_outputs/models_covid_token --codes DEMAND_DEMANDA_TOTAL --lookbacks 7,14 --forecasts 7,14
+python predap_cli.py quantize --trained-model-folder ../trained_models --codes DEMAND_DEMANDA_TOTAL --lookback 7 --forecasts 30,60
 ```
 
 Això permet fer quantització local després d'un entrenament sense dependre d'un servidor MLflow.
@@ -138,7 +149,7 @@ python predap_cli.py sample-data --start 2010-01-01 --end 2023-10-31
 Entrenar un model univariant:
 
 ```bash
-python predap_cli.py train --stage univariate --code TOTAL --lookback 7 --forecast 7
+python predap_cli.py train --stage univariate --code TOTAL --lookback 7 --forecast 30
 ```
 
 Reconstruir i predir amb models quantitzats:
